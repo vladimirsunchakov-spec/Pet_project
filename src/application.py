@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 from starlette.middleware.cors import CORSMiddleware
+from src.healthcheck.router import router
 
 
-
-async def get_app() -> FastAPI:
+def get_app() -> FastAPI:
 
     """
     Get FastAPI application.
@@ -26,6 +26,7 @@ async def get_app() -> FastAPI:
         allow_methods=['*'],
         allow_headers=['*'],
     )
+    app.include_router(router)
 
 
     return app
