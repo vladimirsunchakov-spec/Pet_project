@@ -7,6 +7,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from src.config import Settings
 from src.models.users import Base  # or wherever your Base is
+from src.models.base import Base
+from src.models.users import UserModel
+from src.models.passports import PassportModel
+from src.models.authors import AuthorModel
+from src.models.books import BookModel
+from src.models.author_book import author_book
+from src.models.countries import CountryModel
+from src.models.cities import CityModel
 
 # Alembic Config object
 config = context.config
