@@ -1,8 +1,8 @@
 """add all models
 
-Revision ID: b8b179b6ae78
+Revision ID: 3862ad261808
 Revises: 
-Create Date: 2026-03-03 11:58:38.010286
+Create Date: 2026-03-03 12:07:43.351207
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b8b179b6ae78'
+revision: str = '3862ad261808'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -45,9 +45,9 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('username', sa.String(), nullable=False),
     sa.Column('phone', sa.String(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('phone')
     )
-    op.create_index(op.f('ix_users_phone'), 'users', ['phone'], unique=True)
     op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
     op.create_table('author_book',
     sa.Column('author_id', sa.Uuid(), nullable=False),
@@ -88,7 +88,6 @@ def downgrade() -> None:
     op.drop_table('cities')
     op.drop_table('author_book')
     op.drop_index(op.f('ix_users_username'), table_name='users')
-    op.drop_index(op.f('ix_users_phone'), table_name='users')
     op.drop_table('users')
     op.drop_index(op.f('ix_countries_name'), table_name='countries')
     op.drop_index(op.f('ix_countries_continent'), table_name='countries')

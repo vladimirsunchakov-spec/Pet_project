@@ -11,7 +11,7 @@ class UserModel(Base):
     __tablename__ = 'users'
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     username: Mapped[str] = mapped_column(sa.String(), unique=True, index=True)
-    phone: Mapped[str] = mapped_column(sa.String(), unique=True, index=True)
+    phone: Mapped[str] = mapped_column(sa.String(), unique=True)
 
 # Связываем с паспортом (один к одному)
     passport: Mapped["PassportModel"] = relationship(
