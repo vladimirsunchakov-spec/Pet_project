@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from src.config import Settings
-from src.models.users import Base  # or wherever your Base is
+from src.models.users import Base
 from src.models.base import Base
 from src.models.users import UserModel
 from src.models.passports import PassportModel
