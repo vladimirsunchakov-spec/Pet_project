@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from uuid import UUID
-from typing import List
 
 class CityNestedSchema(BaseModel):
     name: str
@@ -9,7 +8,7 @@ class CityNestedSchema(BaseModel):
 class CountryCreate(BaseModel):
     name: str
     continent: str
-    cities: List[CityNestedSchema]
+    cities: list[CityNestedSchema]
 # схема для страны с городами
 
 class CountryUpdate(CountryCreate):
@@ -20,7 +19,7 @@ class CountryResponse(BaseModel):
     id: UUID
     name: str
     continent: str
-    cities: List[CityNestedSchema]
+    cities: list[CityNestedSchema]
  # ответ с данными страны
     class Config:
         from_attributes = True

@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from uuid import UUID
-from typing import List
 
 
 class BookSchema(BaseModel):
@@ -9,7 +8,7 @@ class BookSchema(BaseModel):
 
 class AuthorCreate(BaseModel):
     name: str
-    books: List[BookSchema]  # вложенный JSON с книгами
+    books: list[BookSchema]  # вложенный JSON с книгами
 # создание автора с вложенным JSON с книгами
 
 class AuthorUpdate(AuthorCreate):
@@ -19,7 +18,7 @@ class AuthorUpdate(AuthorCreate):
 class AuthorResponse(BaseModel):
     id: UUID
     name: str
-    books: List[BookSchema]
+    books: list[BookSchema]
 # вложенные книги при ответе
     class Config:
         from_attributes = True
