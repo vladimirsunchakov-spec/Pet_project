@@ -4,6 +4,7 @@ from uuid import UUID
 from src.services.users import UserService
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
 from src.db import get_session
+from src.schemas.base import StatusResponse
 
 router = APIRouter(prefix="/v1/users-passports", tags=["Users & Passports"])
 
@@ -29,10 +30,10 @@ async def update_user(
 
     return await UserService.update(db, user_id, data)
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
 
     await UserService.delete(db, user_id)
-    return None
+    return StatusResponse(status="deleted")

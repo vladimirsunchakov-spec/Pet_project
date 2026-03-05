@@ -4,6 +4,7 @@ from uuid import UUID
 from src.services.books import BookService
 from src.schemas.books import BookCreate, BookUpdate, BookResponse
 from src.db import get_session
+from src.schemas.base import StatusResponse
 
 router = APIRouter(prefix="/v1/books", tags=["Books"])
 
@@ -29,10 +30,10 @@ async def update_book(
 
     return await BookService.update(db, book_id, data)
 
-@router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{book_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_session)):
 
     await BookService.delete(db, book_id)
-    return None
+    return StatusResponse(status="deleted")

@@ -4,6 +4,7 @@ from uuid import UUID
 from src.services.countries import CountryService
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.db import get_session
+from src.schemas.base import StatusResponse
 
 router = APIRouter(prefix="/v1/countries-cities", tags=["Countries & Cities"])
 
@@ -29,10 +30,10 @@ async def update_country(
 
     return await CountryService.update(db, country_id, data)
 
-@router.delete("/{country_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{country_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_country(
     country_id: UUID,
     db: AsyncSession = Depends(get_session)):
 
     await CountryService.delete(db, country_id)
-    return None
+    return StatusResponse(status="deleted")

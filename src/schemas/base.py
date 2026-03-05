@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class HealthCheckResponse(BaseModel):
+class StatusResponse(BaseModel):
     status: str
 
     class Config:
