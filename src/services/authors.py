@@ -25,7 +25,6 @@ class AuthorService:
                 # Создаем новую книгу
                 book = BookModel(title=book_data.title)
                 db.add(book)
-                await db.flush()
                 # Связываем книгу с автором
             author.books.append(book)
 
@@ -75,7 +74,6 @@ class AuthorService:
             if not book:
                 book = BookModel(title=book_data.title)
                 db.add(book)
-                await db.flush()
 
             author.books.append(book)
         await db.commit()
