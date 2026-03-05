@@ -5,7 +5,7 @@ from src.services.authors import AuthorService
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/authors", tags=["Authors"])
+router = APIRouter(prefix="/v1/authors-books", tags=["Authors & Books"])
 
 @router.post("/", response_model=AuthorResponse, status_code=status.HTTP_201_CREATED)
 async def create_author(

@@ -5,7 +5,7 @@ from src.services.users import UserService
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/users", tags=["Users"])
+router = APIRouter(prefix="/v1/users-passports", tags=["Users & Passports"])
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(

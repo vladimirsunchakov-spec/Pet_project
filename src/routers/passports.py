@@ -5,7 +5,7 @@ from src.services.passports import PassportService
 from src.schemas.passports import PassportCreate, PassportUpdate, PassportResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/passports", tags=["Passports"])
+router = APIRouter(prefix="/v1/passports", tags=["Passports"])
 
 @router.post("/", response_model=PassportResponse, status_code=status.HTTP_201_CREATED)
 async def create_passport(

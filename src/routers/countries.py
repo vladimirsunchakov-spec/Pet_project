@@ -5,7 +5,7 @@ from src.services.countries import CountryService
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/countries", tags=["Countries"])
+router = APIRouter(prefix="/v1/countries-cities", tags=["Countries & Cities"])
 
 @router.post("/", response_model=CountryResponse, status_code=status.HTTP_201_CREATED)
 async def create_country(

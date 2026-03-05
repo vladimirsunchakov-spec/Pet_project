@@ -5,7 +5,7 @@ from src.services.cities import CityService
 from src.schemas.cities import CityCreate, CityUpdate, CityResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/cities", tags=["Cities"])
+router = APIRouter(prefix="/v1/cities", tags=["Cities"])
 
 @router.post("/", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
 async def create_city(

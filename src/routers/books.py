@@ -5,7 +5,7 @@ from src.services.books import BookService
 from src.schemas.books import BookCreate, BookUpdate, BookResponse
 from src.db import get_session
 
-router = APIRouter(prefix="/books", tags=["Books"])
+router = APIRouter(prefix="/v1/books", tags=["Books"])
 
 @router.post("/", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
