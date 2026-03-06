@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from uuid import UUID
-from fastapi import HTTPException, status
+
+from src.exceptions import NotFoundError
 
 from src.models.cities import CityModel
 from src.models.countries import CountryModel
@@ -17,9 +18,7 @@ class CityService:
         country = result.scalar_one_or_none()
 
         if not country:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Country not found")
+            raise NotFoundError("Country not found")
         # Создаем город
         city = CityModel.from_schema(data, country_id)
         db.add(city)
@@ -36,20 +35,22 @@ class CityService:
         city = result.scalar_one_or_none()
 
         if not city:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="City not found")
+            raise NotFoundError("City not found")
 
         return CityResponse.model_validate(city)
 
     @staticmethod
     async def update(db: AsyncSession, city_id: UUID, data: CityUpdate) -> CityResponse:
-        # Обновление города
-        await CityService.get_by_id(db, city_id)
+        query = select(CityModel).where(CityModel.id == city_id)
+        result = await db.execute(query)
+        city = result.scalar_one_or_none()
 
-        stmt = update(CityModel).where(CityModel.id == city_id).values(name=data.name)
-        await db.execute(stmt)
+        if not city:
+            raise NotFoundError("City not found")
+
+        city.name = data.name
         await db.commit()
+        await db.refresh(city)
 
-        return await CityService.get_by_id(db, city_id)
+        return CityResponse.model_validate(city)
 

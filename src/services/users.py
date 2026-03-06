@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from uuid import UUID
-from fastapi import HTTPException, status
+from src.exceptions import NotFoundError, ConflictError
 
 from src.models.users import UserModel
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
@@ -14,16 +14,12 @@ class UserService:
         query = select(UserModel).where(UserModel.username == data.username)
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already exists")
+            raise ConflictError("Username already exists")
         # Проверяем, что phone уникален
         query = select(UserModel).where(UserModel.phone == data.phone)
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Phone already exists")
+            raise ConflictError("Phone already exists")
 
         user = UserModel.from_schema(data)
         db.add(user)
@@ -40,17 +36,19 @@ class UserService:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found")
+            raise NotFoundError("User not found")
 
         return UserResponse.model_validate(user)
 
     @staticmethod
     async def update(db: AsyncSession, user_id: UUID, data: UserUpdate) -> UserResponse:
-        # Обновление пользователя
-        # Проверяем существование
-        await UserService.get_by_id(db, user_id)
+        query = select(UserModel).where(UserModel.id == user_id)
+        result = await db.execute(query)
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise NotFoundError("User not found")
+
         # Проверяем уникальность username
         query = select(UserModel).where(
             UserModel.username == data.username,
@@ -58,27 +56,18 @@ class UserService:
         )
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already exists")
-        # Проверяем уникальность phone
-        query = select(UserModel).where(
-            UserModel.phone == data.phone,
-            UserModel.id != user_id)
-        result = await db.execute(query)
+            raise ConflictError("Phone already exists")
+
+        user.username = data.username
+        user.phone = data.phone
+
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Phone already exists")
+            raise ConflictError("Phone already exists")
 
-        stmt = update(UserModel).where(UserModel.id == user_id).values(
-            username=data.username,
-            phone=data.phone
-        )
-        await db.execute(stmt)
         await db.commit()
+        await db.refresh(user)
 
-        return await UserService.get_by_id(db, user_id)
+        return UserResponse.model_validate(user)
 
     @staticmethod
     async def delete(db: AsyncSession, user_id: UUID) -> None:

@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from uuid import UUID
-from fastapi import HTTPException, status
+
+from src.exceptions import NotFoundError
 
 from src.models.authors import AuthorModel
 from src.models.books import BookModel
@@ -35,28 +36,21 @@ class AuthorService:
         author = result.scalar_one_or_none()
 
         if not author:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Author not found")
+            raise NotFoundError("Author not found")
+
 
         return AuthorResponse.model_validate(author)
 
     @staticmethod
     async def update(db: AsyncSession, author_id: UUID, data: AuthorUpdate) -> AuthorResponse:
-        # Обновление автора и книг
-        # Проверка существование автора
-        await AuthorService.get_by_id(db, author_id)
-
-        # Обновление имя автора
-        stmt = update(AuthorModel).where(AuthorModel.id == author_id).values(name=data.name)
-        await db.execute(stmt)
-
-        # Получаем автора для работы со связями
         query = select(AuthorModel).where(AuthorModel.id == author_id)
         result = await db.execute(query)
         author = result.scalar_one()
+        if not author:
+            raise NotFoundError("Author not found")
+        # Обновляем имя
+        author.name = data.name
 
-        # Очищаем старые связи
         author.books = []
 
         # Создаем новые связи

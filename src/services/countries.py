@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from uuid import UUID
-from fastapi import HTTPException, status
+
+from src.exceptions import NotFoundError
 
 from src.models.countries import CountryModel
 from src.models.cities import CityModel
@@ -31,26 +32,22 @@ class CountryService:
         country = result.scalar_one_or_none()
 
         if not country:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Country not found")
+            raise NotFoundError("Country not found")
 
         return CountryResponse.model_validate(country)
 
     @staticmethod
     async def update(db: AsyncSession, country_id: UUID, data: CountryUpdate) -> CountryResponse:
-        # Обновление страны и городов
-        await CountryService.get_by_id(db, country_id)
-        # Обновляем данные страны
-        stmt = update(CountryModel).where(CountryModel.id == country_id).values(
-            name=data.name,
-            continent=data.continent
-        )
-        await db.execute(stmt)
-        # Получаем страну для работы с городами
         query = select(CountryModel).where(CountryModel.id == country_id)
         result = await db.execute(query)
-        country = result.scalar_one()
+        country = result.scalar_one_or_none()
+
+        if not country:
+            raise NotFoundError("Country not found")
+
+        country.name = data.name
+        country.continent = data.continent
+
         # Удаляем старые города, каскадное удаление
         for city in country.cities:
             await db.delete(city)

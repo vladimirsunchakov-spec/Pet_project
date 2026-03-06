@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from uuid import UUID
-from fastapi import HTTPException, status
+from src.exceptions import NotFoundError, ConflictError
 
 from src.models.passports import PassportModel
 from src.models.users import UserModel
@@ -17,23 +17,17 @@ class PassportService:
         user = result.scalar_one_or_none()
 
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found")
+            raise NotFoundError("User not found")
         # Проверяем, нет ли уже другого паспорта у этого пользователя
         query = select(PassportModel).where(PassportModel.user_id == data.user_id)
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="User already has a passport")
+            raise ConflictError("User already has a passport")
         # Проверяем уникальность номера паспорта
         query = select(PassportModel).where(PassportModel.passport_number == data.passport_number)
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Passport number already exists")
+            raise ConflictError("Passport number already exists")
         # Создаем паспорт
         passport = PassportModel.from_schema(data)
         db.add(passport)
@@ -50,17 +44,19 @@ class PassportService:
         passport = result.scalar_one_or_none()
 
         if not passport:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Passport not found")
+            raise NotFoundError("Passport not found")
 
         return PassportResponse.model_validate(passport)
 
     @staticmethod
     async def update(db: AsyncSession, passport_id: UUID, data: PassportUpdate) -> PassportResponse:
-        # Обновление паспорта
-        # Проверяем существование
-        await PassportService.get_by_id(db, passport_id)
+        query = select(PassportModel).where(PassportModel.id == passport_id)
+        result = await db.execute(query)
+        passport = result.scalar_one_or_none()
+
+        if not passport:
+            raise NotFoundError("Passport not found")
+
         # Проверяем уникальность номера
         query = select(PassportModel).where(
             PassportModel.passport_number == data.passport_number,
@@ -68,18 +64,14 @@ class PassportService:
         )
         result = await db.execute(query)
         if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Passport number already exists"
-            )
+            raise ConflictError("Passport number already exists")
 
-        stmt = update(PassportModel).where(PassportModel.id == passport_id).values(
-            passport_number=data.passport_number)
-            # user_id не обновляем!
-        await db.execute(stmt)
+        passport.passport_number = data.passport_number
+
         await db.commit()
+        await db.refresh(passport)
 
-        return await PassportService.get_by_id(db, passport_id)
+        return PassportResponse.model_validate(passport)
 
     @staticmethod
     async def delete(db: AsyncSession, passport_id: UUID) -> None:
@@ -96,8 +88,6 @@ class PassportService:
         passport = result.scalar_one_or_none()
 
         if not passport:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Passport not found for this user")
+            raise NotFoundError("Passport not found for this user")
 
         return PassportResponse.model_validate(passport)
