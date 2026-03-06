@@ -61,15 +61,10 @@ class AuthorService:
 
         # Создаем новые связи
         for book_data in data.books:
-            query = select(BookModel).where(BookModel.title == book_data.title)
-            result = await db.execute(query)
-            book = result.scalar_one_or_none()
-
-            if not book:
-                book = BookModel(title=book_data.title)
-                db.add(book)
-
+            book = BookModel(title=book_data.title)
+            db.add(book)
             author.books.append(book)
+
         await db.commit()
         await db.refresh(author)
 
