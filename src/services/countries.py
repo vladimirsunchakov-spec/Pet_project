@@ -11,7 +11,7 @@ class CountryService:
     @staticmethod
     async def create(db: AsyncSession, data: CountryCreate) -> CountryResponse:
         # Создание страны с городами. Страна
-        country = CountryModel(name=data.name, continent=data.continent)
+        country = CountryModel.from_schema(data)
         db.add(country)
         await db.flush()
         # Создаем вложенные города

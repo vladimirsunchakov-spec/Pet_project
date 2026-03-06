@@ -21,7 +21,7 @@ class CityService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Country not found")
         # Создаем город
-        city = CityModel(name=data.name, country_id=country_id)
+        city = CityModel.from_schema(data, country_id)
         db.add(city)
         await db.commit()
         await db.refresh(city)
@@ -53,9 +53,3 @@ class CityService:
 
         return await CityService.get_by_id(db, city_id)
 
-    @staticmethod
-    async def delete(db: AsyncSession, city_id: UUID) -> None:
-        # Удаление города
-        city = await CityService.get_by_id(db, city_id)
-        await db.delete(city)
-        await db.commit()

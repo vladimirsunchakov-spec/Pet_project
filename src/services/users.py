@@ -25,7 +25,7 @@ class UserService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone already exists")
 
-        user = UserModel(username=data.username, phone=data.phone)
+        user = UserModel.from_schema(data)
         db.add(user)
         await db.commit()
         await db.refresh(user)
@@ -86,3 +86,4 @@ class UserService:
         user = await UserService.get_by_id(db, user_id)
         await db.delete(user)
         await db.commit()
+

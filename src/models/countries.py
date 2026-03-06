@@ -19,3 +19,9 @@ class CountryModel(Base):
     cities: Mapped[list["CityModel"]] = relationship(
         back_populates="country",
         cascade="all, delete-orphan")
+
+    @classmethod
+    def from_schema(cls, data: "CountryCreate") -> "CountryModel":
+        return cls(
+            name=data.name,
+            continent=data.continent)

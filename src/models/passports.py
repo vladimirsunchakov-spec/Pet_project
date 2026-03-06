@@ -21,3 +21,9 @@ class PassportModel(Base):
 
     # Связь с User (один к одному)
     user: Mapped["UserModel"] = relationship(back_populates="passport")
+
+    @classmethod
+    def from_schema(cls, data: "PassportCreate") -> "PassportModel":
+        return cls(
+            passport_number=data.passport_number,
+            user_id=data.user_id)

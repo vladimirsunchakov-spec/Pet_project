@@ -18,3 +18,9 @@ class UserModel(Base):
         back_populates="user",
         uselist=False,
         cascade="all, delete")
+
+    @classmethod
+    def from_schema(cls, data: "UserCreate") -> "UserModel":
+        return cls(
+            username=data.username,
+            phone=data.phone)

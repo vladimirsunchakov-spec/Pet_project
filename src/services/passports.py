@@ -35,9 +35,7 @@ class PassportService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Passport number already exists")
         # Создаем паспорт
-        passport = PassportModel(
-            passport_number=data.passport_number,
-            user_id=data.user_id)
+        passport = PassportModel.from_schema(data)
         db.add(passport)
         await db.commit()
         await db.refresh(passport)

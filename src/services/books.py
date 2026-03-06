@@ -10,7 +10,7 @@ class BookService:
     @staticmethod
     async def create(db: AsyncSession, data: BookCreate) -> BookResponse:
         # Создание книги
-        book = BookModel(title=data.title)
+        book = BookModel.from_schema(data)
         db.add(book)
         await db.commit()
         await db.refresh(book)

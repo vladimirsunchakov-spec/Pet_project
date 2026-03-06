@@ -21,3 +21,9 @@ class CityModel(Base):
 
     # Связь с Country
     country: Mapped["CountryModel"] = relationship(back_populates="cities")
+
+    @classmethod
+    def from_schema(cls, data: "CityCreate", country_id: UUID) -> "CityModel":
+        return cls(
+            name=data.name,
+            country_id=country_id)

@@ -18,3 +18,8 @@ class BookModel(Base):
     authors: Mapped[list["AuthorModel"]] = relationship(
         secondary="author_book",
         back_populates="books")
+
+    @classmethod
+    def from_schema(cls, data: "BookCreate") -> "BookModel":
+        return cls(
+            title=data.title)

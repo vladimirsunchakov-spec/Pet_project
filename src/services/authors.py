@@ -11,7 +11,7 @@ class AuthorService:
     @staticmethod
     async def create(db: AsyncSession, data: AuthorCreate) -> AuthorResponse:
     # создание автора с вложенными книгами
-        author = AuthorModel(name=data.name)
+        author = AuthorModel.from_schema(data)
         db.add(author)
         await db.flush()
         # Обрабатываем вложенные книги
