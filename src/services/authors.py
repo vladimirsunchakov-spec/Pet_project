@@ -16,16 +16,10 @@ class AuthorService:
         await db.flush()
         # Обрабатываем вложенные книги
         for book_data in data.books:
-            # Ищем книгу по названию
-            query = select(BookModel).where(BookModel.title == book_data.title)
-            result = await db.execute(query)
-            book = result.scalar_one_or_none()
-
-            if not book:
-                # Создаем новую книгу
-                book = BookModel(title=book_data.title)
-                db.add(book)
-                # Связываем книгу с автором
+            # Создаем новую книгу для автора
+            book = BookModel(title=book_data.title)
+            db.add(book)
+            # Связываем книгу с автором
             author.books.append(book)
 
         await db.commit()
