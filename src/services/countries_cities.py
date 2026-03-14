@@ -7,17 +7,16 @@ from src.models.countries import CountryModel
 from src.models.cities import CityModel
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.schemas.cities import CityCreate, CityUpdate, CityResponse
+from src.schemas.base import StatusResponse
 
 class CountriesCitiesService:
     @staticmethod
     async def create_country(db: AsyncSession, data: CountryCreate) -> CountryResponse:
-        # Создание страны с городами. Страна
         country = CountryModel.from_schema(data)
         db.add(country)
         await db.flush()
-        # Создаем вложенные города
         for city_data in data.cities:
-            city = CityModel(name=city_data.name, country_id=country.id)
+            city = CityModel.from_schema(city_data, country_id=country.id)
             db.add(city)
         await db.commit()
         await db.refresh(country)
@@ -26,7 +25,6 @@ class CountriesCitiesService:
 
     @staticmethod
     async def get_country(db: AsyncSession, country_id: UUID) -> CountryResponse:
-        # Получение страны по ID с вложенными городами
         query = select(CountryModel).where(CountryModel.id == country_id)
         result = await db.execute(query)
         country = result.scalar_one_or_none()
@@ -48,12 +46,10 @@ class CountriesCitiesService:
         country.name = data.name
         country.continent = data.continent
 
-        # Удаляем старые города, каскадное удаление
         for city in country.cities:
             await db.delete(city)
-        # Создаем новые города
         for city_data in data.cities:
-            city = CityModel(name=city_data.name, country_id=country.id)
+            city = CityModel.from_schema(city_data, country_id=country.id)
             db.add(city)
 
         await db.commit()
@@ -63,7 +59,6 @@ class CountriesCitiesService:
 
     @staticmethod
     async def delete_country(db: AsyncSession, country_id: UUID) -> None:
-        # Удаление страны
         query = select(CountryModel).where(CountryModel.id == country_id)
         result = await db.execute(query)
         country = result.scalar_one_or_none()
@@ -74,27 +69,10 @@ class CountriesCitiesService:
         await db.delete(country)
         await db.commit()
 
-    @staticmethod
-    async def create_city(db: AsyncSession, data: CityCreate, country_id: UUID) -> CityResponse:
-        # Создание города в какой-то стране
-        # Проверяем, что страна существует
-        query = select(CountryModel).where(CountryModel.id == country_id)
-        result = await db.execute(query)
-        country = result.scalar_one_or_none()
-
-        if not country:
-            raise NotFoundError("Country not found")
-        # Создаем город
-        city = CityModel.from_schema(data, country_id)
-        db.add(city)
-        await db.commit()
-        await db.refresh(city)
-
-        return CityResponse.model_validate(city)
+        return StatusResponse(status="deleted")
 
     @staticmethod
     async def get_city(db: AsyncSession, city_id: UUID) -> CityResponse:
-        # Получение города по ID
         query = select(CityModel).where(CityModel.id == city_id)
         result = await db.execute(query)
         city = result.scalar_one_or_none()
@@ -130,3 +108,5 @@ class CountriesCitiesService:
 
         await db.delete(city)
         await db.commit()
+
+        return StatusResponse(status="deleted")

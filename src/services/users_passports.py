@@ -7,17 +7,16 @@ from src.models.users import UserModel
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
 from src.models.passports import PassportModel
 from src.schemas.passports import PassportCreate, PassportUpdate, PassportResponse
+from src.schemas.base import StatusResponse
 
 class UsersPassportsService:
     @staticmethod
     async def create_users(db: AsyncSession, data: UserCreate) -> UserResponse:
-        # Создание пользователя
-        # Проверяем, что username уникален
         query = select(UserModel).where(UserModel.username == data.username)
         result = await db.execute(query)
         if result.scalar_one_or_none():
             raise ConflictError("Username already exists")
-        # Проверяем, что phone уникален
+
         query = select(UserModel).where(UserModel.phone == data.phone)
         result = await db.execute(query)
         if result.scalar_one_or_none():
@@ -32,7 +31,6 @@ class UsersPassportsService:
 
     @staticmethod
     async def get_user(db: AsyncSession, user_id: UUID) -> UserResponse:
-        # Получение пользователя по ID
         query = select(UserModel).where(UserModel.id == user_id)
         result = await db.execute(query)
         user = result.scalar_one_or_none()
@@ -50,7 +48,7 @@ class UsersPassportsService:
 
         if not user:
             raise NotFoundError("User not found")
-        # Проверяем уникальность username
+
         query = select(UserModel).where(
             UserModel.username == data.username,
             UserModel.id != user_id
@@ -76,8 +74,7 @@ class UsersPassportsService:
         return UserResponse.model_validate(user)
 
     @staticmethod
-    async def delete_user(db: AsyncSession, user_id: UUID) -> None:
-        # Удаление пользователя, каскадно удалится паспорт
+    async def delete_user(db: AsyncSession, user_id: UUID) -> StatusResponse:
         query = select(UserModel).where(UserModel.id == user_id)
         result = await db.execute(query)
         user = result.scalar_one_or_none()
@@ -88,27 +85,26 @@ class UsersPassportsService:
         await db.delete(user)
         await db.commit()
 
+        return StatusResponse(status="deleted")
     @staticmethod
     async def create_passport(db: AsyncSession, data: PassportCreate) -> PassportResponse:
-        # Создание паспорта и привязка к пользователю
-        # Проверяем, что пользователь существует
         query = select(UserModel).where(UserModel.id == data.user_id)
         result = await db.execute(query)
         user = result.scalar_one_or_none()
 
         if not user:
             raise NotFoundError("User not found")
-        # Проверяем, нет ли уже другого паспорта у этого пользователя
+
         query = select(PassportModel).where(PassportModel.user_id == data.user_id)
         result = await db.execute(query)
         if result.scalar_one_or_none():
             raise ConflictError("User already has a passport")
-        # Проверяем уникальность номера паспорта
+
         query = select(PassportModel).where(PassportModel.passport_number == data.passport_number)
         result = await db.execute(query)
         if result.scalar_one_or_none():
             raise ConflictError("Passport number already exists")
-        # Создаем паспорт
+
         passport = PassportModel.from_schema(data)
         db.add(passport)
         await db.commit()
@@ -118,7 +114,6 @@ class UsersPassportsService:
 
     @staticmethod
     async def get_passport(db: AsyncSession, passport_id: UUID) -> PassportResponse:
-        # Получение паспорта по ID
         query = select(PassportModel).where(PassportModel.id == passport_id)
         result = await db.execute(query)
         passport = result.scalar_one_or_none()
@@ -137,7 +132,6 @@ class UsersPassportsService:
         if not passport:
             raise NotFoundError("Passport not found")
 
-        # Проверяем уникальность номера
         query = select(PassportModel).where(
             PassportModel.passport_number == data.passport_number,
             PassportModel.id != passport_id
@@ -154,8 +148,8 @@ class UsersPassportsService:
         return PassportResponse.model_validate(passport)
 
     @staticmethod
-    async def delete_passport(db: AsyncSession, passport_id: UUID) -> None:
-        query = select(PassportModel).where(PassportModel.user_id == user_id)
+    async def delete_passport(db: AsyncSession, passport_id: UUID) -> StatusResponse:
+        query = select(PassportModel).where(PassportModel.id == passport_id)
         result = await db.execute(query)
         passport = result.scalar_one_or_none()
 
@@ -165,9 +159,10 @@ class UsersPassportsService:
         await db.delete(passport)
         await db.commit()
 
+        return StatusResponse(status="deleted")
+
     @staticmethod
     async def get_passport_by_user(db: AsyncSession, user_id: UUID) -> PassportResponse:
-        # Получение паспорта по ID пользователя
         query = select(PassportModel).where(PassportModel.user_id == user_id)
         result = await db.execute(query)
         passport = result.scalar_one_or_none()
