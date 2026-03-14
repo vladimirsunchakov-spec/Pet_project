@@ -1,7 +1,7 @@
 from .base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import UUID, uuid4
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 import sqlalchemy as sa
 from datetime import date
 
@@ -13,12 +13,12 @@ class AuthorModel(Base):
     __tablename__ = "authors"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(sa.String(), index=True)
+    name: Mapped[str] = mapped_column(sa.String())
     birth_date: Mapped[date | None] = mapped_column(sa.Date, nullable=True)
     country: Mapped[str | None] = mapped_column(sa.String(), nullable=True)
 
-    # Связь многие ко многим с Book через author_book
-    books: Mapped[list["BookModel"]] = relationship(
+
+    books: Mapped[List["BookModel"]] = relationship(
         secondary="author_book",
         back_populates="authors",
         cascade="all, delete")

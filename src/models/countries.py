@@ -1,7 +1,7 @@
 from .base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import UUID, uuid4
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 import sqlalchemy as sa
 
 if TYPE_CHECKING:
@@ -12,11 +12,11 @@ class CountryModel(Base):
     __tablename__ = "countries"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(sa.String(), index=True)
-    continent: Mapped[str] = mapped_column(sa.String(), index=True)
+    name: Mapped[str] = mapped_column(sa.String())
+    continent: Mapped[str] = mapped_column(sa.String())
 
-    # Связь один ко многим с City
-    cities: Mapped[list["CityModel"]] = relationship(
+
+    cities: Mapped[List["CityModel"]] = relationship(
         back_populates="country",
         cascade="all, delete-orphan")
 

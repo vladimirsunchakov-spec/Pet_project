@@ -13,13 +13,12 @@ class CityModel(Base):
     __tablename__ = "cities"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(sa.String(), index=True)
+    name: Mapped[str] = mapped_column(sa.String())
     country_id: Mapped[UUID] = mapped_column(
         ForeignKey("countries.id", ondelete="CASCADE"),
-        index=True
-    )
+        )
 
-    # Связь с Country
+
     country: Mapped["CountryModel"] = relationship(back_populates="cities")
 
     @classmethod

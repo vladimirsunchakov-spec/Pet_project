@@ -1,7 +1,7 @@
 from .base import Base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import UUID, uuid4
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 import sqlalchemy as sa
 
 if TYPE_CHECKING:
@@ -12,10 +12,10 @@ class BookModel(Base):
     __tablename__ = "books"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    title: Mapped[str] = mapped_column(sa.String(), index=True)
+    title: Mapped[str] = mapped_column(sa.String())
 
-    # Связь многие ко многим с Author через author_book
-    authors: Mapped[list["AuthorModel"]] = relationship(
+
+    authors: Mapped[List["AuthorModel"]] = relationship(
         secondary="author_book",
         back_populates="books")
 

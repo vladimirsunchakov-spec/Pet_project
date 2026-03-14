@@ -13,13 +13,12 @@ class PassportModel(Base):
     __tablename__ = "passports"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    passport_number: Mapped[str] = mapped_column(sa.String(), unique=True, index=True)
+    passport_number: Mapped[str] = mapped_column(sa.String(), unique=True)
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
-        unique=True,
-        index=True )
+        unique=True
+        )
 
-    # Связь с User (один к одному)
     user: Mapped["UserModel"] = relationship(back_populates="passport")
 
     @classmethod
