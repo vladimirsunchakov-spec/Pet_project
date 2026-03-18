@@ -1,7 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-
+from src.core.enums import StatusEnum
+from src.services.base import BaseService
+from src.core.request_id import get_request_id
 from src.exceptions import NotFoundError
 from src.models.countries import CountryModel
 from src.models.cities import CityModel
@@ -9,30 +11,53 @@ from src.schemas.countries import CountryCreate, CountryUpdate
 from src.schemas.cities import CityCreate, CityUpdate
 from src.schemas.base import StatusResponse
 
-class CountriesCitiesService:
-    @staticmethod
-    async def create_country(db: AsyncSession, data: CountryCreate) -> CountryModel:
+class CountriesCitiesService(BaseService):
+    @classmethod
+    async def create_country(cls, db: AsyncSession, data: CountryCreate, request_id: str | None = None) -> CountryModel:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Creating country", request_id=request_id, name=data.name)
+
         country = CountryModel.from_schema(data)
         db.add(country)
         await db.flush()
+
         for city_data in data.cities:
             city = CityModel.from_schema(city_data, country.id)
             db.add(city)
 
+        cls._log_info("Created country", entity_id=country.id, request_id=request_id, cities_count=len(data.cities))
+
         return country
 
-    @staticmethod
-    async def get_country(db: AsyncSession, country_id: UUID) -> CountryModel | None:
+    @classmethod
+    async def get_country(cls,db: AsyncSession, country_id: UUID, request_id: str | None = None) -> CountryModel | None:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Fetching country", entity_id=country_id, request_id=request_id)
+
         query = select(CountryModel).where(CountryModel.id == country_id)
         result = await db.execute(query)
-        return result.scalar_one_or_none()
+        country = result.scalar_one_or_none()
+        if not country:
+            cls._log_warning("Country not found", entity_id=country_id, request_id=request_id)
 
-    @staticmethod
-    async def update_country(db: AsyncSession, country_id: UUID, data: CountryUpdate) -> CountryModel:
-        country = await CountriesCitiesService.get_country(db, country_id)
+        return country
+
+    @classmethod
+    async def update_country(cls, db: AsyncSession, country_id: UUID, data: CountryUpdate, request_id: str | None = None) -> CountryModel:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Updating country", entity_id=country_id, request_id=request_id)
+
+        country = await cls.get_country(db, country_id, request_id=request_id)
 
         if not country:
-            raise NotFoundError("Country not found")
+            cls._log_error("Country not found for update", entity_id=country_id, request_id=request_id)
+            raise NotFoundError("Country", str(country_id))
 
         country.name = data.name
         country.continent = data.continent
@@ -44,51 +69,98 @@ class CountriesCitiesService:
             city = CityModel.from_schema(city_data, country.id)
             db.add(city)
 
+        cls._log_info("Updated country", entity_id=country_id, request_id=request_id, cities_count=len(data.cities))
+
         return country
 
-    @staticmethod
-    async def delete_country(db: AsyncSession, country_id: UUID) -> StatusResponse:
-        country = await CountriesCitiesService.get_country(db, country_id)
+    @classmethod
+    async def delete_country(cls, db: AsyncSession, country_id: UUID, request_id: str | None = None) -> StatusResponse:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Deleting country", entity_id=country_id, request_id=request_id)
+
+        country = await cls.get_country(db, country_id, request_id=request_id)
 
         if not country:
-            raise NotFoundError("Country not found")
+            cls._log_error("Country not found", entity_id=country_id, request_id=request_id)
+            raise NotFoundError("Country", str(country_id))
 
         await db.delete(country)
-        return StatusResponse(status="deleted")
 
-    @staticmethod
-    async def create_city(db: AsyncSession, data: CityCreate, country_id: UUID) -> CityModel:
-        country = await CountriesCitiesService.get_country(db, country_id)
+        cls._log_info("Deleted country", entity_id=country_id, request_id=request_id)
+
+        return StatusResponse(status=StatusEnum.DELETED)
+
+    @classmethod
+    async def create_city(cls, db: AsyncSession, data: CityCreate, country_id: UUID, request_id: str | None = None) -> CityModel:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Creating city", request_id=request_id, name=data.name, country_id=str(country_id))
+
+        country = await cls.get_country(db, country_id, request_id=request_id)
 
         if not country:
-            raise NotFoundError("Country not found")
+            cls._log_error("Country not found for city creation", entity_id=country_id, request_id=request_id)
+            raise NotFoundError("Country", str(country_id))
 
         city = CityModel.from_schema(data, country.id)
         db.add(city)
+
+        cls._log_info("City created", entity_id=city.id, request_id=request_id)
+
         return city
 
-    @staticmethod
-    async def get_city(db: AsyncSession, city_id: UUID) -> CityModel |None:
+    @classmethod
+    async def get_city(cls, db: AsyncSession, city_id: UUID, request_id: str | None = None) -> CityModel | None:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Fetching city", entity_id=city_id, request_id=request_id)
+
         query = select(CityModel).where(CityModel.id == city_id)
         result = await db.execute(query)
-        return result.scalar_one_or_none()
-
-    @staticmethod
-    async def update_city(db: AsyncSession, city_id: UUID, data: CityUpdate) -> CityModel:
-        city = await CountriesCitiesService.get_city(db, city_id)
+        city = result.scalar_one_or_none()
 
         if not city:
-            raise NotFoundError("City not found")
+            cls._log_warning("City not found", entity_id=city_id, request_id=request_id)
 
-        city.name = data.name
         return city
 
-    @staticmethod
-    async def delete_city(db: AsyncSession, city_id: UUID) -> StatusResponse:
-        city = await CountriesCitiesService.get_city(db, city_id)
+    @classmethod
+    async def update_city(cls, db: AsyncSession, city_id: UUID, data: CityUpdate, request_id: str | None = None) -> CityModel:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Updating city", entity_id=city_id, request_id=request_id)
+
+        city = await cls.get_city(db, city_id, request_id=request_id)
+        if not city:
+            cls._log_error("City not found for update", entity_id=city_id, request_id=request_id)
+            raise NotFoundError("City", str(city_id))
+
+        city.name = data.name
+
+        cls._log_info("Updated city", entity_id=city.id, request_id=request_id)
+
+        return city
+
+    @classmethod
+    async def delete_city(cls, db: AsyncSession, city_id: UUID, request_id: str | None = None) -> StatusResponse:
+        if request_id is None:
+            request_id = get_request_id()
+
+        cls._log_info("Deleting city", entity_id=city_id, request_id=request_id)
+
+        city = await cls.get_city(db, city_id, request_id=request_id)
 
         if not city:
-            raise NotFoundError("City not found")
+            cls._log_error("City not found for deletion", entity_id=city_id, request_id=request_id)
+            raise NotFoundError("City", str(city_id))
 
         await db.delete(city)
-        return StatusResponse(status="deleted")
+
+        cls._log_info("Deleted city", entity_id=city.id, request_id=request_id)
+
+        return StatusResponse(status=StatusEnum.DELETED)
