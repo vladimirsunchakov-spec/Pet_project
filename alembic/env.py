@@ -6,17 +6,13 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from src.config import Settings
 from src.models.base import Base
 
-# Alembic Config object
 config = context.config
 
-# Configure logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# target_metadata for autogenerate
 target_metadata = Base.metadata
 
-# Load settings and override sqlalchemy.url
 settings = Settings()
 
 
