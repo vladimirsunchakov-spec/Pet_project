@@ -1,7 +1,7 @@
 from enum import Enum
 
 class StatusEnum(str, Enum):
-    OK = "oк"
+    OK = "ok"
     DELETED = "deleted"
     CREATED = "created"
     UPDATED = "updated"
