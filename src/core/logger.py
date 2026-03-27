@@ -1,6 +1,6 @@
 import logging
 import sys
-import json
+import ujson
 from datetime import datetime
 
 class JSONEFormatter(logging.Formatter):
@@ -17,7 +17,7 @@ class JSONEFormatter(logging.Formatter):
             log_record["request_id"] = record.request_id
         if hasattr(record, "extra"):
             log_record.update(record.extra)
-        return json.dumps(log_record)
+        return ujson.dumps(log_record)
 
 def setup_logging():
     root_logger = logging.getLogger()
@@ -26,7 +26,7 @@ def setup_logging():
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JSONEFormatter())
-    logger.addHandler(handler)
+    root_logger.addHandler(handler)
 
     return root_logger
 

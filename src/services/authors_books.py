@@ -3,7 +3,7 @@ from sqlalchemy import select, update
 from uuid import UUID
 from src.core.enums import StatusEnum
 from src.services.base import BaseService
-from src.core.request_id import get_request_id
+from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError
 from src.models.authors import AuthorModel
 from src.models.books import BookModel

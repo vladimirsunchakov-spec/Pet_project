@@ -4,7 +4,7 @@ from uuid import UUID
 from src.exceptions import NotFoundError, ConflictError
 from src.core.enums import StatusEnum
 from src.services.base import BaseService
-from src.core.request_id import get_request_id
+from src.middleware.request_id import get_request_id
 from src.models.users import UserModel
 from src.schemas.users import UserCreate, UserUpdate
 from src.models.passports import PassportModel
