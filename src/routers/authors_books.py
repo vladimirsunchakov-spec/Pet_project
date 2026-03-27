@@ -16,7 +16,6 @@ async def create_author(
     data: AuthorCreate,
     db: AsyncSession = Depends(get_session)):
     author = await AuthorsBooksService.create_author(db=db, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(author)
     return AuthorResponse.model_validate(author)
 
@@ -37,7 +36,6 @@ async def update_author(
     data: AuthorUpdate,
     db: AsyncSession = Depends(get_session)):
     author = await AuthorsBooksService.update_author(db=db, author_id=author_id, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(author)
     return AuthorResponse.model_validate(author)
 
@@ -47,7 +45,6 @@ async def delete_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
     result = await AuthorsBooksService.delete_author(db=db, author_id=author_id, request_id=request.state.request_id)
-    await db.commit()
     return result
 
 @router.get("/books/{book_id}", response_model=BookResponse)
@@ -67,7 +64,6 @@ async def update_book(
     data: BookUpdate,
     db: AsyncSession = Depends(get_session)):
     book = await AuthorsBooksService.update_book(db=db, book_id=book_id, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(book)
     return BookResponse.model_validate(book)
 
@@ -77,5 +73,4 @@ async def delete_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_session)):
     result = await AuthorsBooksService.delete_book(db=db, book_id=book_id, request_id=request.state.request_id)
-    await db.commit()
     return result

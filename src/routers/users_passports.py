@@ -16,7 +16,6 @@ async def create_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_session)):
     user = await UsersPassportsService.create_user(db=db, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(user)
     return UserResponse.model_validate(user)
 
@@ -39,9 +38,7 @@ async def update_user(
     data: UserUpdate,
     db: AsyncSession = Depends(get_session)):
     user = await UsersPassportsService.update_user(user_id=user_id, data=data, db=db, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(user)
-
     return UserResponse.model_validate(user)
 
 @router.delete("/{user_id}", response_model=StatusResponse, status_code=status.HTTP_200_OK)
@@ -50,7 +47,6 @@ async def delete_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
     result = await UsersPassportsService.delete_user(user_id=user_id, db=db, request_id=request.state.request_id)
-    await db.commit()
     return result
 
 @router.post("/passports", response_model=PassportResponse, status_code=status.HTTP_201_CREATED)
@@ -59,7 +55,6 @@ async def create_passport(
     data: PassportCreate,
     db: AsyncSession = Depends(get_session)):
     passport = await UsersPassportsService.create_passport(data=data, db=db, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(passport)
     return PassportResponse.model_validate(passport)
 
@@ -80,7 +75,6 @@ async def update_passport(
     data: PassportUpdate,
     db: AsyncSession = Depends(get_session)):
     passport = await UsersPassportsService.update_passport(passport_id=passport_id, data=data, db=db, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(passport)
     return PassportResponse.model_validate(passport)
 

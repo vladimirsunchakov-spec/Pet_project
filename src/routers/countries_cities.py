@@ -17,7 +17,6 @@ async def create_country(
     data: CountryCreate,
     db: AsyncSession = Depends(get_session)):
     country = await CountriesCitiesService.create_country(db=db, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(country)
     return CountryResponse.model_validate(country)
 
@@ -39,8 +38,6 @@ async def update_country(
     data: CountryUpdate,
     db: AsyncSession = Depends(get_session)):
     country = await CountriesCitiesService.update_country(db=db, country_id=country_id, data=data, request_id=request.state.request_id)
-
-    await db.commit()
     await db.refresh(country)
     return CountryResponse.model_validate(country)
 
@@ -50,7 +47,6 @@ async def delete_country(
     country_id: UUID,
     db: AsyncSession = Depends(get_session)):
     result = await CountriesCitiesService.delete_country(db=db, country_id=country_id, request_id=request.state.request_id)
-    await db.commit()
     return result
 
 @router.post("/countries/{country_id}/cities", response_model=CityResponse, status_code=status.HTTP_201_CREATED)
@@ -60,8 +56,6 @@ async def create_city(
     data: CityCreate,
     db: AsyncSession = Depends(get_session)):
     city = await CountriesCitiesService.create_city(db=db, country_id=country_id, data=data, request_id=request.state.request_id)
-
-    await db.commit()
     await db.refresh(city)
     return CityResponse.model_validate(city)
 
@@ -82,7 +76,6 @@ async def update_city(
     data: CityUpdate,
     db: AsyncSession = Depends(get_session)):
     city = await CountriesCitiesService.update_city(db=db, city_id=city_id, data=data, request_id=request.state.request_id)
-    await db.commit()
     await db.refresh(city)
     return CityResponse.model_validate(city)
 
@@ -92,5 +85,4 @@ async def delete_city(
     city_id: UUID,
     db: AsyncSession = Depends(get_session)):
     result = await CountriesCitiesService.delete_city(db=db, city_id=city_id, request_id=request.state.request_id)
-    await db.commit()
     return result
