@@ -160,22 +160,6 @@ class UsersPassportsService(BaseService):
         return passport
 
     @classmethod
-    async def get_passport_by_user(cls, db: AsyncSession, user_id: UUID, request_id: str | None = None) -> PassportModel | None:
-        if request_id is None:
-            request_id = get_request_id()
-
-        cls._log_info("Fetching passport", entity_id=user_id, request_id=request_id)
-
-        query = select(PassportModel).where(PassportModel.user_id == user_id)
-        result = await db.execute(query)
-        passport = result.scalar_one_or_none()
-
-        if not passport:
-            cls._log_warning("Passport not found for user", entity_id=user_id, request_id=request_id)
-
-        return passport
-
-    @classmethod
     async def update_passport(cls, db: AsyncSession, passport_id: UUID, data: PassportUpdate, request_id: str | None = None) -> PassportModel:
         if request_id is None:
             request_id = get_request_id()

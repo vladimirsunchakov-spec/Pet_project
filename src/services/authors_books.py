@@ -80,28 +80,8 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Author", str(author_id))
 
         await db.delete(author)
-
         cls._log_info("Author deleted", entity_id=author.id, request_id=request_id)
-
         return StatusResponse(status=StatusEnum.DELETED)
-
-    @classmethod
-    async def add_book_to_author(cls, db: AsyncSession, author_id: UUID, data: BookCreate, request_id: str | None = None) -> BookModel:
-        if request_id is None:
-            request_id = get_request_id()
-        cls._log_info("Adding book to author", entity_id=author_id, request_id=request_id, title=data.title)
-        author = await cls.get_author(db, author_id, request_id=request_id)
-        if not author:
-            cls._log_error("Author not found for add", entity_id=author_id, request_id=request_id)
-            raise NotFoundError("Author", str(author_id))
-
-        book = BookModel.from_schema(data)
-        db.add(book)
-        author.books.append(book)
-
-        cls._log_info("Book added", entity_id=author.id, request_id=request_id, book_id=str(book.id))
-
-        return book
 
     @classmethod
     async def get_book(cls, db: AsyncSession, book_id: UUID, request_id: str | None = None) -> BookModel | None:
