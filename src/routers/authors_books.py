@@ -50,17 +50,6 @@ async def delete_author(
     await db.commit()
     return result
 
-@router.post("/{author_id}/books", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
-async def add_book_to_author(
-    request: Request,
-    author_id: UUID,
-    data: BookCreate,
-    db: AsyncSession = Depends(get_session)):
-    book = await AuthorsBooksService.add_book_to_author(db=db, author_id=author_id, data=data, request_id=request.state.request_id)
-    await db.commit()
-    await db.refresh(book)
-    return BookResponse.model_validate(book)
-
 @router.get("/books/{book_id}", response_model=BookResponse)
 async def get_book(
     request: Request,

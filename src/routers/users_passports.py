@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, status, Request
-from keyring.backends.macOS.api import NotFound
+from src.exceptions import NotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from src.services.users_passports import UsersPassportsService
@@ -28,7 +28,7 @@ async def get_user(
     db: AsyncSession = Depends(get_session)):
     user = await UsersPassportsService.get_user(db=db, user_id=user_id, request_id=request.state.request_id)
     if not user:
-        raise NotFound("User not found")
+        raise NotFoundError("User not found")
 
     return UserResponse.model_validate(user)
 
@@ -70,17 +70,7 @@ async def get_passport(
     db: AsyncSession = Depends(get_session)):
     passport = await UsersPassportsService.get_passport(passport_id=passport_id, db=db, request_id=request.state.request_id)
     if not passport:
-        raise NotFound("Passport not found")
-    return PassportResponse.model_validate(passport)
-
-@router.get("/passports/by-user/{user_id}", response_model=PassportResponse)
-async def get_passport_by_user(
-    request: Request,
-    user_id: UUID,
-    db: AsyncSession = Depends(get_session)):
-    passport = await UsersPassportsService.get_passport_by_user(user_id=user_id, db=db, request_id=request.state.request_id)
-    if not passport:
-        raise NotFound("Passport not found for this user")
+        raise NotFoundError("Passport not found")
     return PassportResponse.model_validate(passport)
 
 @router.put("/passports/{passport_id}", response_model=PassportResponse)
