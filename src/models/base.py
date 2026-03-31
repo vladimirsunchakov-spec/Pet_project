@@ -6,16 +6,16 @@ metadata = sa.MetaData()
 
 
 class BaseServiceModel:
-    created_At: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
         default=lambda: datetime.now(timezone.utc)
     )
-    updated_At: Mapped[datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc)
     )
-    is_Deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
 
 
     @classmethod

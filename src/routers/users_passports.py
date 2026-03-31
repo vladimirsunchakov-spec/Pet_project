@@ -15,7 +15,12 @@ async def create_user(
     request: Request,
     data: UserCreate,
     db: AsyncSession = Depends(get_session)):
-    user = await UsersPassportsService.create_user(db=db, data=data, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "data": data,
+        "request_id": request.state.request_id
+    }
+    user = await UsersPassportsService.create_user(**params)
     await db.refresh(user)
     return UserResponse.model_validate(user)
 
@@ -25,7 +30,12 @@ async def get_user(
     request: Request,
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    user = await UsersPassportsService.get_user(db=db, user_id=user_id, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "user_id": user_id,
+        "request_id": request.state.request_id
+    }
+    user = await UsersPassportsService.get_user(**params)
     if not user:
         raise NotFoundError("User not found")
 
@@ -37,7 +47,13 @@ async def update_user(
     user_id: UUID,
     data: UserUpdate,
     db: AsyncSession = Depends(get_session)):
-    user = await UsersPassportsService.update_user(user_id=user_id, data=data, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "user_id": user_id,
+        "data": data,
+        "request_id": request.state.request_id
+    }
+    user = await UsersPassportsService.update_user(**params)
     await db.refresh(user)
     return UserResponse.model_validate(user)
 
@@ -46,7 +62,12 @@ async def delete_user(
     request: Request,
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    result = await UsersPassportsService.delete_user(user_id=user_id, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "user_id": user_id,
+        "request_id": request.state.request_id
+    }
+    result = await UsersPassportsService.delete_user(**params)
     return result
 
 @router.post("/passports", response_model=PassportResponse, status_code=status.HTTP_201_CREATED)
@@ -54,7 +75,12 @@ async def create_passport(
     request: Request,
     data: PassportCreate,
     db: AsyncSession = Depends(get_session)):
-    passport = await UsersPassportsService.create_passport(data=data, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "data": data,
+        "request_id": request.state.request_id
+    }
+    passport = await UsersPassportsService.create_passport(**params)
     await db.refresh(passport)
     return PassportResponse.model_validate(passport)
 
@@ -63,7 +89,12 @@ async def get_passport(
     request: Request,
     passport_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    passport = await UsersPassportsService.get_passport(passport_id=passport_id, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "passport_id": passport_id,
+        "request_id": request.state.request_id
+    }
+    passport = await UsersPassportsService.get_passport(**params)
     if not passport:
         raise NotFoundError("Passport not found")
     return PassportResponse.model_validate(passport)
@@ -74,7 +105,13 @@ async def update_passport(
     passport_id: UUID,
     data: PassportUpdate,
     db: AsyncSession = Depends(get_session)):
-    passport = await UsersPassportsService.update_passport(passport_id=passport_id, data=data, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "passport_id": passport_id,
+        "data": data,
+        "request_id": request.state.request_id
+    }
+    passport = await UsersPassportsService.update_passport(**params)
     await db.refresh(passport)
     return PassportResponse.model_validate(passport)
 
@@ -83,6 +120,11 @@ async def delete_passport(
     request: Request,
     passport_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    result = await UsersPassportsService.delete_passport(passport_id=passport_id, db=db, request_id=request.state.request_id)
+    params = {
+        "db": db,
+        "passport_id": passport_id,
+        "request_id": request.state.request_id
+    }
+    result = await UsersPassportsService.delete_passport(**params)
     return result
 

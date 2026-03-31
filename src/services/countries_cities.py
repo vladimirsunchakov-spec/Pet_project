@@ -13,9 +13,10 @@ from src.schemas.base import StatusResponse
 
 class CountriesCitiesService(BaseService):
     @classmethod
-    async def create_country(cls, db: AsyncSession, data: CountryCreate, request_id: str | None = None) -> CountryModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_country(cls, **kwargs) -> CountryModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id")
 
         cls._log_info("Creating country", request_id=request_id, name=data.name)
 
@@ -32,9 +33,10 @@ class CountriesCitiesService(BaseService):
         return country
 
     @classmethod
-    async def get_country(cls,db: AsyncSession, country_id: UUID, request_id: str | None = None) -> CountryModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def get_country(cls, **kwargs) -> CountryModel | None:
+        db = kwargs.get("db")
+        country_id = kwargs.get("country_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Fetching country", entity_id=country_id, request_id=request_id)
 
@@ -47,13 +49,15 @@ class CountriesCitiesService(BaseService):
         return country
 
     @classmethod
-    async def update_country(cls, db: AsyncSession, country_id: UUID, data: CountryUpdate, request_id: str | None = None) -> CountryModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_country(cls, **kwargs) -> CountryModel:
+        db = kwargs.get("db")
+        country_id = kwargs.get("country_id")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Updating country", entity_id=country_id, request_id=request_id)
 
-        country = await cls.get_country(db, country_id, request_id=request_id)
+        country = await cls.get_country(db=db, country_id=country_id, request_id=request_id)
 
         if not country:
             cls._log_error("Country not found for update", entity_id=country_id, request_id=request_id)
@@ -74,13 +78,14 @@ class CountriesCitiesService(BaseService):
         return country
 
     @classmethod
-    async def delete_country(cls, db: AsyncSession, country_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_country(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        country_id = kwargs.get("country_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Deleting country", entity_id=country_id, request_id=request_id)
 
-        country = await cls.get_country(db, country_id, request_id=request_id)
+        country = await cls.get_country(db=db, country_id=country_id, request_id=request_id)
 
         if not country:
             cls._log_error("Country not found", entity_id=country_id, request_id=request_id)
@@ -93,13 +98,15 @@ class CountriesCitiesService(BaseService):
         return StatusResponse(status=StatusEnum.DELETED)
 
     @classmethod
-    async def create_city(cls, db: AsyncSession, data: CityCreate, country_id: UUID, request_id: str | None = None) -> CityModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_city(cls, **kwargs) -> CityModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        country_id = kwargs.get("country_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Creating city", request_id=request_id, name=data.name, country_id=str(country_id))
 
-        country = await cls.get_country(db, country_id, request_id=request_id)
+        country = await cls.get_country(db=db, country_id=country_id, request_id=request_id)
 
         if not country:
             cls._log_error("Country not found for city creation", entity_id=country_id, request_id=request_id)
@@ -113,9 +120,10 @@ class CountriesCitiesService(BaseService):
         return city
 
     @classmethod
-    async def get_city(cls, db: AsyncSession, city_id: UUID, request_id: str | None = None) -> CityModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def get_city(cls, **kwargs) -> CityModel | None:
+        db = kwargs.get("db")
+        city_id = kwargs.get("city_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Fetching city", entity_id=city_id, request_id=request_id)
 
@@ -129,13 +137,15 @@ class CountriesCitiesService(BaseService):
         return city
 
     @classmethod
-    async def update_city(cls, db: AsyncSession, city_id: UUID, data: CityUpdate, request_id: str | None = None) -> CityModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_city(cls, **kwargs) -> CityModel:
+        db = kwargs.get("db")
+        city_id = kwargs.get("city_id")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Updating city", entity_id=city_id, request_id=request_id)
 
-        city = await cls.get_city(db, city_id, request_id=request_id)
+        city = await cls.get_city(db=db, city_id=city_id, request_id=request_id)
         if not city:
             cls._log_error("City not found for update", entity_id=city_id, request_id=request_id)
             raise NotFoundError("City", str(city_id))
@@ -147,13 +157,14 @@ class CountriesCitiesService(BaseService):
         return city
 
     @classmethod
-    async def delete_city(cls, db: AsyncSession, city_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_city(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        city_id = kwargs.get("city_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Deleting city", entity_id=city_id, request_id=request_id)
 
-        city = await cls.get_city(db, city_id, request_id=request_id)
+        city = await cls.get_city(db=db, city_id=city_id, request_id=request_id)
 
         if not city:
             cls._log_error("City not found for deletion", entity_id=city_id, request_id=request_id)

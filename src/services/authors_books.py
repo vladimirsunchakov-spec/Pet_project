@@ -13,9 +13,10 @@ from src.schemas.base import StatusResponse
 
 class AuthorsBooksService(BaseService):
     @classmethod
-    async def create_author(cls, db: AsyncSession, data: AuthorCreate, request_id: str | None = None) -> AuthorModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_author(cls, **kwargs) -> AuthorModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
         cls._log_info("Creating author", request_id=request_id, name=data.name)
 
         author = AuthorModel.from_schema(data)
@@ -26,14 +27,16 @@ class AuthorsBooksService(BaseService):
             book = BookModel.from_schema(book_data)
             db.add(book)
             author.books.append(book)
-        cls._log_info("Author created",entity_id=author.id, request_id=request_id)
 
+        cls._log_info("Author created", entity_id=author.id, request_id=request_id)
         return author
 
     @classmethod
-    async def get_author(cls, db: AsyncSession, author_id: UUID, request_id: str | None = None) -> AuthorModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def get_author(cls, **kwargs) -> AuthorModel | None:
+        db = kwargs.get("db")
+        author_id = kwargs.get("author_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Fetching author", entity_id=author_id, request_id=request_id)
 
         query = select(AuthorModel).where(AuthorModel.id == author_id)
@@ -46,9 +49,12 @@ class AuthorsBooksService(BaseService):
         return author
 
     @classmethod
-    async def update_author(cls, db: AsyncSession, author_id: UUID, data: AuthorUpdate, request_id: str | None = None) -> AuthorModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_author(cls, **kwargs) -> AuthorModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        author_id = kwargs.get("author_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Updating author", entity_id=author_id, request_id=request_id)
 
         author = await cls.get_author(db, author_id, request_id=request_id)
@@ -69,9 +75,11 @@ class AuthorsBooksService(BaseService):
         return author
 
     @classmethod
-    async def delete_author(cls, db: AsyncSession, author_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_author(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        author_id = kwargs.get("author_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Deleting author", entity_id=author_id, request_id=request_id)
 
         author = await cls.get_author(db, author_id, request_id=request_id)
@@ -84,9 +92,25 @@ class AuthorsBooksService(BaseService):
         return StatusResponse(status=StatusEnum.DELETED)
 
     @classmethod
-    async def get_book(cls, db: AsyncSession, book_id: UUID, request_id: str | None = None) -> BookModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_book(cls, **kwargs) -> BookModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
+
+        cls._log_info("Creating book", request_id=request_id, title=data.title)
+
+        book = BookModel.from_schema(data)
+        db.add(book)
+
+        cls._log_info("Book created", entity_id=book.id, request_id=request_id)
+        return book
+
+    @classmethod
+    async def get_book(cls, **kwargs) -> BookModel | None:
+        db = kwargs.get("db")
+        book_id = kwargs.get("book_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Fetching book", entity_id=book_id, request_id=request_id)
 
         query = select(BookModel).where(BookModel.id == book_id)
@@ -98,12 +122,15 @@ class AuthorsBooksService(BaseService):
         return book
 
     @classmethod
-    async def update_book(cls, db: AsyncSession, book_id: UUID, data: BookUpdate, request_id: str | None = None) -> BookModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_book(cls, **kwargs) -> BookModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        book_id = kwargs.get("book_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Updating book", entity_id=book_id, request_id=request_id)
 
-        book = await cls.get_book(db, book_id, request_id=request_id)
+        book = await cls.get_book(db=db, book_id=book_id, request_id=request_id)
         if not book:
             cls._log_error("Book not found for update", entity_id=book_id, request_id=request_id)
             raise NotFoundError("Book", str(book_id))
@@ -113,13 +140,14 @@ class AuthorsBooksService(BaseService):
         return book
 
     @classmethod
-    async def delete_book(cls, db: AsyncSession, book_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_book(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        book_id = kwargs.get("book_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Deleting book", entity_id=book_id, request_id=request_id)
 
-        book = await cls.get_book(db, book_id, request_id=request_id)
+        book = await cls.get_book(db=db, book_id=book_id, request_id=request_id)
         if not book:
             cls._log_error("Book not found for deletion", entity_id=book_id, request_id=request_id)
             raise NotFoundError("Book", str(book_id))

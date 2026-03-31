@@ -13,9 +13,10 @@ from src.schemas.base import StatusResponse
 
 class UsersPassportsService(BaseService):
     @classmethod
-    async def create_user(cls, db: AsyncSession, data: UserCreate, request_id: str | None = None) -> UserModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_user(cls, **kwargs) -> UserModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Creating user", request_id=request_id, username=data.username, phone=data.phone)
 
@@ -41,9 +42,10 @@ class UsersPassportsService(BaseService):
         return user
 
     @classmethod
-    async def get_user(cls, db: AsyncSession, user_id: UUID, request_id: str | None =None) -> UserModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def get_user(cls, **kwargs) -> UserModel | None:
+        db = kwargs.get("db")
+        user_id = kwargs.get("user_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Fetching user", entity_id=user_id, request_id=request_id)
 
@@ -57,13 +59,15 @@ class UsersPassportsService(BaseService):
         return user
 
     @classmethod
-    async def update_user(cls, db: AsyncSession, user_id: UUID, data: UserUpdate, request_id: str | None = None) -> UserModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_user(cls, **kwargs) -> UserModel:
+        db = kwargs.get("db")
+        user_id = kwargs.get("user_id")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Updating user", entity_id=user_id, request_id=request_id)
 
-        user = await cls.get_user(db, user_id, request_id=request_id)
+        user = await cls.get_user(db=db, user_id=user_id, request_id=request_id)
 
         if not user:
             cls._log_error("User not found for update", entity_id=user_id, request_id=request_id)
@@ -95,12 +99,14 @@ class UsersPassportsService(BaseService):
         return user
 
     @classmethod
-    async def delete_user(cls, db: AsyncSession, user_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_user(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        user_id = kwargs.get("user_id")
+        request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Deleting user", entity_id=user_id, request_id=request_id)
 
-        user = await cls.get_user(db, user_id, request_id=request_id)
+        user = await cls.get_user(db=db, user_id=user_id, request_id=request_id)
         if not user:
             cls._log_error("User not found for deletion", entity_id=user_id, request_id=request_id)
             raise NotFoundError("User", str(user_id))
@@ -110,13 +116,14 @@ class UsersPassportsService(BaseService):
         return StatusResponse(status=StatusEnum.DELETED)
 
     @classmethod
-    async def create_passport(cls, db: AsyncSession, data: PassportCreate, request_id: str | None = None) -> PassportModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def create_passport(cls, **kwargs) -> PassportModel:
+        db = kwargs.get("db")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Creating passport", request_id=request_id, passport_number=data.passport_number, user_id=str(data.user_id))
 
-        user = await cls.get_user(db, data.user_id, request_id=request_id)
+        user = await cls.get_user(db=db, user_id=data.user_id, request_id=request_id)
 
         if not user:
             cls._log_error("User not found for passport creation", entity_id=data.user_id, request_id=request_id)
@@ -144,9 +151,10 @@ class UsersPassportsService(BaseService):
         return passport
 
     @classmethod
-    async def get_passport(cls, db: AsyncSession, passport_id: UUID, request_id: str | None = None) -> PassportModel | None:
-        if request_id is None:
-            request_id = get_request_id()
+    async def get_passport(cls, **kwargs) -> PassportModel | None:
+        db= kwargs.get("db")
+        passport_id = kwargs.get("passport_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Fetching passport", entity_id=passport_id, request_id=request_id)
 
@@ -160,13 +168,15 @@ class UsersPassportsService(BaseService):
         return passport
 
     @classmethod
-    async def update_passport(cls, db: AsyncSession, passport_id: UUID, data: PassportUpdate, request_id: str | None = None) -> PassportModel:
-        if request_id is None:
-            request_id = get_request_id()
+    async def update_passport(cls, **kwargs) -> PassportModel:
+        db = kwargs.get("db")
+        passport_id = kwargs.get("passport_id")
+        data = kwargs.get("data")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Updating passport", entity_id=passport_id, request_id=request_id)
 
-        passport = await cls.get_passport(db, passport_id, request_id=request_id)
+        passport = await cls.get_passport(db=db, passport_id=passport_id, request_id=request_id)
 
         if not passport:
             cls._log_error("Passport not found for update", entity_id=passport_id, request_id=request_id)
@@ -188,13 +198,14 @@ class UsersPassportsService(BaseService):
         return passport
 
     @classmethod
-    async def delete_passport(cls, db: AsyncSession, passport_id: UUID, request_id: str | None = None) -> StatusResponse:
-        if request_id is None:
-            request_id = get_request_id()
+    async def delete_passport(cls, **kwargs) -> StatusResponse:
+        db = kwargs.get("db")
+        passport_id = kwargs.get("passport_id")
+        request_id = kwargs.get("request_id", get_request_id())
 
         cls._log_info("Deleting passport", entity_id=passport_id, request_id=request_id)
 
-        passport = await cls.get_passport(db, passport_id, request_id=request_id)
+        passport = await cls.get_passport(db=db, passport_id=passport_id, request_id=request_id)
 
         if not passport:
             cls._log_error("Passport not found for deletion", entity_id=passport_id, request_id=request_id)
