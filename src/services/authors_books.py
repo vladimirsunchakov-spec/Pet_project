@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from uuid import UUID
-from src.core.enums import StatusEnum
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError
@@ -17,6 +16,7 @@ class AuthorsBooksService(BaseService):
         db = kwargs.get("db")
         data = kwargs.get("data")
         request_id = kwargs.get("request_id", get_request_id())
+
         cls._log_info("Creating author", request_id=request_id, name=data.name)
 
         author = AuthorModel.from_schema(data)
@@ -27,6 +27,9 @@ class AuthorsBooksService(BaseService):
             book = BookModel.from_schema(book_data)
             db.add(book)
             author.books.append(book)
+
+        await db.commit()
+        await db.refresh(author)
 
         cls._log_info("Author created", entity_id=author.id, request_id=request_id)
         return author
@@ -69,13 +72,14 @@ class AuthorsBooksService(BaseService):
             book = BookModel.from_schema(book_data)
             db.add(book)
             author.books.append(book)
-
+        await db.commit()
+        await db.refresh(author)
         cls._log_info("Author updated", entity_id=author.id, request_id=request_id)
 
         return author
 
     @classmethod
-    async def delete_author(cls, **kwargs) -> StatusResponse:
+    async def delete_author(cls, **kwargs) -> None:
         db = kwargs.get("db")
         author_id = kwargs.get("author_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -88,8 +92,8 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Author", str(author_id))
 
         await db.delete(author)
+        await db.commit()
         cls._log_info("Author deleted", entity_id=author.id, request_id=request_id)
-        return StatusResponse(status=StatusEnum.DELETED)
 
     @classmethod
     async def create_book(cls, **kwargs) -> BookModel:
@@ -101,7 +105,8 @@ class AuthorsBooksService(BaseService):
 
         book = BookModel.from_schema(data)
         db.add(book)
-
+        await db.commit()
+        await db.refresh(book)
         cls._log_info("Book created", entity_id=book.id, request_id=request_id)
         return book
 
@@ -136,11 +141,13 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Book", str(book_id))
 
         book.title = data.title
+        await db.commit()
+        await db.refresh(book)
         cls._log_info("Book updated", entity_id=book_id, request_id=request_id)
         return book
 
     @classmethod
-    async def delete_book(cls, **kwargs) -> StatusResponse:
+    async def delete_book(cls, **kwargs) -> None:
         db = kwargs.get("db")
         book_id = kwargs.get("book_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -153,5 +160,5 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Book", str(book_id))
 
         await db.delete(book)
+        await db.commit()
         cls._log_info("Book deleted", entity_id=book_id, request_id=request_id)
-        return StatusResponse(status=StatusEnum.DELETED)

@@ -2,16 +2,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 from src.exceptions import NotFoundError, ConflictError
-from src.core.enums import StatusEnum
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.models.users import UserModel
 from src.schemas.users import UserCreate, UserUpdate
 from src.models.passports import PassportModel
 from src.schemas.passports import PassportCreate, PassportUpdate
-from src.schemas.base import StatusResponse
 
 class UsersPassportsService(BaseService):
+
     @classmethod
     async def create_user(cls, **kwargs) -> UserModel:
         db = kwargs.get("db")
@@ -20,22 +19,17 @@ class UsersPassportsService(BaseService):
 
         cls._log_info("Creating user", request_id=request_id, username=data.username, phone=data.phone)
 
-        query = select(UserModel).where(UserModel.username == data.username)
-        result = await db.execute(query)
-
-        if result.scalar_one_or_none():
-            cls._log_error("User already exists", request_id=request_id, username=data.username)
-            raise ConflictError("Username", data.username)
-
-        query = select(UserModel).where(UserModel.phone == data.phone)
-        result = await db.execute(query)
-
-        if result.scalar_one_or_none():
-            cls._log_error("Phone already exists", request_id=request_id, phone=data.phone)
-            raise ConflictError("Phone", data.phone)
+        await cls._check_uniqueness(
+            db=db,
+            model=UserModel,
+            fields={"username": data.username, "phone": data.phone},
+            request_id=request_id,
+        )
 
         user = UserModel.from_schema(data)
         db.add(user)
+        await db.commit()
+        await db.refresh(user)
 
         cls._log_info("Created user", entity_id=user.id,  request_id=request_id)
 
@@ -73,33 +67,23 @@ class UsersPassportsService(BaseService):
             cls._log_error("User not found for update", entity_id=user_id, request_id=request_id)
             raise NotFoundError("User", str(user_id))
 
-        query = select(UserModel).where(
-            UserModel.username == data.username,
-            UserModel.id != user_id)
-        result = await db.execute(query)
-
-        if result.scalar_one_or_none():
-            cls._log_error("User already exists for update", request_id=request_id, username=data.username)
-            raise ConflictError("Username", data.username)
-
-        query = select(UserModel).where(
-            UserModel.phone == data.phone,
-            UserModel.id != user_id)
-
-        result = await db.execute(query)
-        if result.scalar_one_or_none():
-            cls._log_error("Phone already exists for update", request_id=request_id, phone=data.phone)
-            raise ConflictError("Phone", data.phone)
+        await cls._check_uniqueness(
+            db=db,
+            model=UserModel,
+            fields={"username": data.username, "phone": data.phone},
+            exclude_id=user_id,
+            request_id=request_id)
 
         user.username = data.username
         user.phone = data.phone
+        await db.commit()
+        await db.refresh(user)
 
         cls._log_info("Updated user", entity_id=user.id, request_id=request_id)
-
         return user
 
     @classmethod
-    async def delete_user(cls, **kwargs) -> StatusResponse:
+    async def delete_user(cls, **kwargs) -> None:
         db = kwargs.get("db")
         user_id = kwargs.get("user_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -112,8 +96,8 @@ class UsersPassportsService(BaseService):
             raise NotFoundError("User", str(user_id))
 
         await db.delete(user)
+        await db.commit()
         cls._log_info("Deleted user", entity_id=user.id, request_id=request_id)
-        return StatusResponse(status=StatusEnum.DELETED)
 
     @classmethod
     async def create_passport(cls, **kwargs) -> PassportModel:
@@ -129,30 +113,23 @@ class UsersPassportsService(BaseService):
             cls._log_error("User not found for passport creation", entity_id=data.user_id, request_id=request_id)
             raise NotFoundError("User", str(data.user_id))
 
-        query = select(PassportModel).where(PassportModel.user_id == data.user_id)
-        result = await db.execute(query)
-
-        if result.scalar_one_or_none():
-            cls._log_error("User already has a passport", entity_id=data.user_id, request_id=request_id)
-            raise ConflictError("User", str(data.user_id))
-
-        query = select(PassportModel).where(PassportModel.passport_number == data.passport_number)
-        result = await db.execute(query)
-
-        if result.scalar_one_or_none():
-            cls._log_error("Passport number already exists", request_id=request_id, passport_number=data.passport_number)
-            raise ConflictError("Passport number", data.passport_number)
-
+        await cls._check_uniqueness(
+            db=db,
+            model=PassportModel,
+            fields={"user_id": data.user_id, "passport_number": data.passport_number},
+            request_id=request_id
+        )
         passport = PassportModel.from_schema(data)
         db.add(passport)
+        await db.commit()
+        await db.refresh(passport)
 
         cls._log_info("Created passport", entity_id=passport.id, request_id=request_id, user_id=str(data.user_id))
-
         return passport
 
     @classmethod
     async def get_passport(cls, **kwargs) -> PassportModel | None:
-        db= kwargs.get("db")
+        db = kwargs.get("db")
         passport_id = kwargs.get("passport_id")
         request_id = kwargs.get("request_id", get_request_id())
 
@@ -177,28 +154,26 @@ class UsersPassportsService(BaseService):
         cls._log_info("Updating passport", entity_id=passport_id, request_id=request_id)
 
         passport = await cls.get_passport(db=db, passport_id=passport_id, request_id=request_id)
-
         if not passport:
             cls._log_error("Passport not found for update", entity_id=passport_id, request_id=request_id)
             raise NotFoundError("Passport", str(passport_id))
 
-        query = select(PassportModel).where(
-            PassportModel.passport_number == data.passport_number,
-            PassportModel.id != passport_id
+        await cls._check_uniqueness(
+            db=db,
+            model=PassportModel,
+            fields={"passport_number": data.passport_number},
+            exclude_id=passport_id,
+            request_id=request_id
         )
-        result = await db.execute(query)
-        if result.scalar_one_or_none():
-            cls._log_error("Passport number already exists for update", request_id=request_id, passport_number=data.passport_number)
-            raise ConflictError("Passport number", data.passport_number)
-
         passport.passport_number = data.passport_number
+        await db.commit()
+        await db.refresh(passport)
 
         cls._log_info("Passport updated", entity_id=passport.id, request_id=request_id)
-
         return passport
 
     @classmethod
-    async def delete_passport(cls, **kwargs) -> StatusResponse:
+    async def delete_passport(cls, **kwargs) -> None:
         db = kwargs.get("db")
         passport_id = kwargs.get("passport_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -212,8 +187,8 @@ class UsersPassportsService(BaseService):
             raise NotFoundError("Passport", str(passport_id))
 
         await db.delete(passport)
+        await db.commit()
 
         cls._log_info("Deleted passport", entity_id=passport.id, request_id=request_id)
 
-        return StatusResponse(status=StatusEnum.DELETED)
 
