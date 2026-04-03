@@ -28,7 +28,6 @@ class AuthorsBooksService(BaseService):
             db.add(book)
             author.books.append(book)
 
-        await db.commit()
         await db.refresh(author)
 
         cls._log_info("Author created", entity_id=author.id, request_id=request_id)
@@ -72,7 +71,6 @@ class AuthorsBooksService(BaseService):
             book = BookModel.from_schema(book_data)
             db.add(book)
             author.books.append(book)
-        await db.commit()
         await db.refresh(author)
         cls._log_info("Author updated", entity_id=author.id, request_id=request_id)
 
@@ -92,7 +90,6 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Author", str(author_id))
 
         await db.delete(author)
-        await db.commit()
         cls._log_info("Author deleted", entity_id=author.id, request_id=request_id)
 
     @classmethod
@@ -105,7 +102,6 @@ class AuthorsBooksService(BaseService):
 
         book = BookModel.from_schema(data)
         db.add(book)
-        await db.commit()
         await db.refresh(book)
         cls._log_info("Book created", entity_id=book.id, request_id=request_id)
         return book
@@ -141,7 +137,6 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Book", str(book_id))
 
         book.title = data.title
-        await db.commit()
         await db.refresh(book)
         cls._log_info("Book updated", entity_id=book_id, request_id=request_id)
         return book
@@ -160,5 +155,4 @@ class AuthorsBooksService(BaseService):
             raise NotFoundError("Book", str(book_id))
 
         await db.delete(book)
-        await db.commit()
         cls._log_info("Book deleted", entity_id=book_id, request_id=request_id)

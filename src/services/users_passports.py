@@ -28,7 +28,6 @@ class UsersPassportsService(BaseService):
 
         user = UserModel.from_schema(data)
         db.add(user)
-        await db.commit()
         await db.refresh(user)
 
         cls._log_info("Created user", entity_id=user.id,  request_id=request_id)
@@ -76,7 +75,6 @@ class UsersPassportsService(BaseService):
 
         user.username = data.username
         user.phone = data.phone
-        await db.commit()
         await db.refresh(user)
 
         cls._log_info("Updated user", entity_id=user.id, request_id=request_id)
@@ -96,7 +94,6 @@ class UsersPassportsService(BaseService):
             raise NotFoundError("User", str(user_id))
 
         await db.delete(user)
-        await db.commit()
         cls._log_info("Deleted user", entity_id=user.id, request_id=request_id)
 
     @classmethod
@@ -121,7 +118,6 @@ class UsersPassportsService(BaseService):
         )
         passport = PassportModel.from_schema(data)
         db.add(passport)
-        await db.commit()
         await db.refresh(passport)
 
         cls._log_info("Created passport", entity_id=passport.id, request_id=request_id, user_id=str(data.user_id))
@@ -166,7 +162,6 @@ class UsersPassportsService(BaseService):
             request_id=request_id
         )
         passport.passport_number = data.passport_number
-        await db.commit()
         await db.refresh(passport)
 
         cls._log_info("Passport updated", entity_id=passport.id, request_id=request_id)
@@ -187,7 +182,6 @@ class UsersPassportsService(BaseService):
             raise NotFoundError("Passport", str(passport_id))
 
         await db.delete(passport)
-        await db.commit()
 
         cls._log_info("Deleted passport", entity_id=passport.id, request_id=request_id)
 

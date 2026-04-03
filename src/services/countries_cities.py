@@ -25,8 +25,6 @@ class CountriesCitiesService(BaseService):
         for city_data in data.cities:
             city = CityModel.from_schema(city_data, country.id)
             db.add(city)
-
-        await db.commit()
         await db.refresh(country)
 
         cls._log_info("Created country", entity_id=country.id, request_id=request_id, cities_count=len(data.cities))
@@ -73,8 +71,6 @@ class CountriesCitiesService(BaseService):
         for city_data in data.cities:
             city = CityModel.from_schema(city_data, country.id)
             db.add(city)
-
-        await db.commit()
         await db.refresh(country)
 
         cls._log_info("Updated country", entity_id=country_id, request_id=request_id, cities_count=len(data.cities))
@@ -95,7 +91,6 @@ class CountriesCitiesService(BaseService):
             raise NotFoundError("Country", str(country_id))
 
         await db.delete(country)
-        await db.commit()
 
         cls._log_info("Deleted country", entity_id=country_id, request_id=request_id)
 
@@ -115,7 +110,6 @@ class CountriesCitiesService(BaseService):
 
         city = CityModel.from_schema(data, country.id)
         db.add(city)
-        await db.commit()
         await db.refresh(country)
 
         cls._log_info("City created", entity_id=city.id, request_id=request_id)
@@ -154,7 +148,6 @@ class CountriesCitiesService(BaseService):
             raise NotFoundError("City", str(city_id))
 
         city.name = data.name
-        await db.commit()
         await db.refresh(city)
 
         cls._log_info("Updated city", entity_id=city.id, request_id=request_id)
@@ -176,6 +169,5 @@ class CountriesCitiesService(BaseService):
             raise NotFoundError("City", str(city_id))
 
         await db.delete(city)
-        await db.commit()
 
         cls._log_info("Deleted city", entity_id=city.id, request_id=request_id)
