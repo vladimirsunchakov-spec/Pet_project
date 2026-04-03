@@ -41,9 +41,8 @@ class BaseService:
                 query = query.where(getattr(model, "id") != exclude_id)
             result = await db.execute(query)
             if result.scalar_one_or_none():
-                if request_id:
-                    cls._get_logger().error(
-                        f"{field_name.capitalize()} already exist",
-                        extra={"extra": {field_name: field_value, "request_id": request_id}}
+                cls._get_logger().error(
+                    f"{field_name.capitalize()} already exist",
+                    extra={"extra": {field_name: field_value, "request_id": request_id}}
                     )
-                raise ConflictError(field_name.capitalize(), field_value)
+            raise ConflictError(field_name.capitalize(), field_value)
