@@ -14,25 +14,16 @@ router = APIRouter(prefix="/v1/users-passports", tags=["Users & Passports"])
 async def create_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "data": data
-    }
-    user = await UsersPassportsService.create_user(**params)
+    user = await UsersPassportsService.create_user(data=data, db=db)
     return UserResponse.model_validate(user)
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "user_id": user_id
-    }
-    user = await UsersPassportsService.get_user(**params)
+    user = await UsersPassportsService.get_user(user_id=user_id, db=db)
     if not user:
         raise NotFoundError("User not found")
-
     return UserResponse.model_validate(user)
 
 @router.put("/{user_id}", response_model=UserResponse)
@@ -40,45 +31,27 @@ async def update_user(
     user_id: UUID,
     data: UserUpdate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "user_id": user_id,
-        "data": data
-    }
-    user = await UsersPassportsService.update_user(**params)
+    user = await UsersPassportsService.update_user(user_id=user_id, data=data, db=db)
     return UserResponse.model_validate(user)
 
 @router.delete("/{user_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "user_id": user_id
-    }
-    await UsersPassportsService.delete_user(**params)
-
+    await UsersPassportsService.delete_user(user_id=user_id, db=db)
 
 @router.post("/passports", response_model=PassportResponse, status_code=status.HTTP_201_CREATED)
 async def create_passport(
     data: PassportCreate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "data": data
-    }
-    passport = await UsersPassportsService.create_passport(**params)
+    passport = await UsersPassportsService.create_passport(data=data, db=db)
     return PassportResponse.model_validate(passport)
 
 @router.get("/passports/{passport_id}", response_model=PassportResponse)
 async def get_passport(
     passport_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "passport_id": passport_id
-    }
-    passport = await UsersPassportsService.get_passport(**params)
+    passport = await UsersPassportsService.get_passport(passport_id=passport_id, db=db)
     if not passport:
         raise NotFoundError("Passport not found")
     return PassportResponse.model_validate(passport)
@@ -88,22 +61,13 @@ async def update_passport(
     passport_id: UUID,
     data: PassportUpdate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "passport_id": passport_id,
-        "data": data
-    }
-    passport = await UsersPassportsService.update_passport(**params)
+    passport = await UsersPassportsService.update_passport(passport_id=passport_id, data=data, db=db)
     return PassportResponse.model_validate(passport)
 
 @router.delete("/passports/{passport_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_passport(
     passport_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "passport_id": passport_id
-    }
-    await UsersPassportsService.delete_passport(**params)
+    await UsersPassportsService.delete_passport(passport_id=passport_id, db=db)
 
 

@@ -14,22 +14,15 @@ router = APIRouter(prefix="/v1/authors-books", tags=["Authors & Books"])
 async def create_author(
     data: AuthorCreate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "data": data,
-    }
-    author = await AuthorsBooksService.create_author(**params)
+
+    author = await AuthorsBooksService.create_author(data=data, db=db)
     return AuthorResponse.model_validate(author)
 
 @router.get("/{author_id}", response_model=AuthorResponse)
 async def get_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "author_id": author_id,
-    }
-    author = await AuthorsBooksService.get_author(**params)
+    author = await AuthorsBooksService.get_author(author_id=author_id, db=db)
     if not author:
         raise NotFoundError("Author not found")
     return AuthorResponse.model_validate(author)
@@ -39,46 +32,27 @@ async def update_author(
     author_id: UUID,
     data: AuthorUpdate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "author_id": author_id,
-        "data": data,
-    }
-    author = await AuthorsBooksService.update_author(**params)
+    author = await AuthorsBooksService.update_author(author_id=author_id, data=data, db=db)
     return AuthorResponse.model_validate(author)
 
 @router.delete("/{author_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "author_id": author_id,
-    }
-    await AuthorsBooksService.delete_author(**params)
-
+    await AuthorsBooksService.delete_author(author_id=author_id, db=db)
 
 @router.post("/books", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
-        data: BookCreate,
-        db: AsyncSession = Depends(get_session)
-):
-        params = {
-            "db": db,
-            "data": data,
-        }
-        book = await AuthorsBooksService.create_book(**params)
-        return BookResponse.model_validate(book)
+    data: BookCreate,
+    db: AsyncSession = Depends(get_session)):
+    book = await AuthorsBooksService.create_book(data=data, db=db)
+    return BookResponse.model_validate(book)
 
 @router.get("/books/{book_id}", response_model=BookResponse)
 async def get_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "book_id": book_id,
-    }
-    book = await AuthorsBooksService.get_book(**params)
+    book = await AuthorsBooksService.get_book(book_id=book_id, db=db)
     if not book:
         raise NotFoundError("Book not found")
     return BookResponse.model_validate(book)
@@ -88,20 +62,11 @@ async def update_book(
     book_id: UUID,
     data: BookUpdate,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "book_id": book_id,
-        "data": data,
-    }
-    book = await AuthorsBooksService.update_book(**params)
+    book = await AuthorsBooksService.update_book(book_id=book_id, data=data, db=db)
     return BookResponse.model_validate(book)
 
 @router.delete("/books/{book_id}", response_model=StatusResponse, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_book(
     book_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    params = {
-        "db": db,
-        "book_id": book_id,
-    }
-    await AuthorsBooksService.delete_book(**params)
+    await AuthorsBooksService.delete_book(book_id=book_id, db=db)
