@@ -35,7 +35,7 @@ class UsersPassportsService(BaseService):
         return user
 
     @classmethod
-    async def get_user(cls, **kwargs) -> UserModel | None:
+    async def get_user(cls, **kwargs) -> UserModel:
         db = kwargs.get("db")
         user_id = kwargs.get("user_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -48,6 +48,7 @@ class UsersPassportsService(BaseService):
 
         if not user:
             cls._log_warning("User not found", entity_id=user_id, request_id=request_id)
+            raise NotFoundError("User", str(user_id))
 
         return user
 
@@ -124,7 +125,7 @@ class UsersPassportsService(BaseService):
         return passport
 
     @classmethod
-    async def get_passport(cls, **kwargs) -> PassportModel | None:
+    async def get_passport(cls, **kwargs) -> PassportModel:
         db = kwargs.get("db")
         passport_id = kwargs.get("passport_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -137,6 +138,7 @@ class UsersPassportsService(BaseService):
 
         if not passport:
             cls._log_warning("Passport not found", entity_id=passport_id, request_id=request_id)
+            raise NotFoundError("Passport", str(passport_id))
 
         return passport
 

@@ -32,7 +32,7 @@ class CountriesCitiesService(BaseService):
         return country
 
     @classmethod
-    async def get_country(cls, **kwargs) -> CountryModel | None:
+    async def get_country(cls, **kwargs) -> CountryModel:
         db = kwargs.get("db")
         country_id = kwargs.get("country_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -45,6 +45,7 @@ class CountriesCitiesService(BaseService):
 
         if not country:
             cls._log_warning("Country not found", entity_id=country_id, request_id=request_id)
+            raise NotFoundError ("Country", str(country_id))
 
         return country
 
@@ -117,7 +118,7 @@ class CountriesCitiesService(BaseService):
         return city
 
     @classmethod
-    async def get_city(cls, **kwargs) -> CityModel | None:
+    async def get_city(cls, **kwargs) -> CityModel:
         db = kwargs.get("db")
         city_id = kwargs.get("city_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -130,6 +131,7 @@ class CountriesCitiesService(BaseService):
 
         if not city:
             cls._log_warning("City not found", entity_id=city_id, request_id=request_id)
+            raise NotFoundError("City", str(city_id))
 
         return city
 

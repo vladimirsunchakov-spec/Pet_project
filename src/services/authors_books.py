@@ -34,7 +34,7 @@ class AuthorsBooksService(BaseService):
         return author
 
     @classmethod
-    async def get_author(cls, **kwargs) -> AuthorModel | None:
+    async def get_author(cls, **kwargs) -> AuthorModel:
         db = kwargs.get("db")
         author_id = kwargs.get("author_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -47,6 +47,7 @@ class AuthorsBooksService(BaseService):
 
         if not author:
             cls._log_warning("Author not found", entity_id=author_id, request_id=request_id)
+            raise NotFoundError ("Author", str(author_id))
 
         return author
 
@@ -107,7 +108,7 @@ class AuthorsBooksService(BaseService):
         return book
 
     @classmethod
-    async def get_book(cls, **kwargs) -> BookModel | None:
+    async def get_book(cls, **kwargs) -> BookModel:
         db = kwargs.get("db")
         book_id = kwargs.get("book_id")
         request_id = kwargs.get("request_id", get_request_id())
@@ -120,6 +121,7 @@ class AuthorsBooksService(BaseService):
 
         if not book:
             cls._log_warning("Book not found", entity_id=book_id, request_id=request_id)
+            raise NotFoundError("Book", str(book_id))
         return book
 
     @classmethod
