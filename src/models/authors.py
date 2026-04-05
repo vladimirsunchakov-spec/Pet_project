@@ -7,7 +7,7 @@ from datetime import date
 
 if TYPE_CHECKING:
     from .books import BookModel
-
+    from src.schemas.authors import AuthorCreate
 
 class AuthorModel(Base):
     __tablename__ = "authors"

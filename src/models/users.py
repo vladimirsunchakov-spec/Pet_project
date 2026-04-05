@@ -6,13 +6,13 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .passports import PassportModel
+    from src.schemas.users import UserCreate
 
 class UserModel(Base):
     __tablename__ = 'users'
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     username: Mapped[str] = mapped_column(sa.String(), unique=True)
     phone: Mapped[str] = mapped_column(sa.String(), unique=True)
-
 
     passport: Mapped["PassportModel"] = relationship(
         back_populates="user",

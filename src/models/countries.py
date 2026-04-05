@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .cities import CityModel
-
+    from src.schemas.countries import CountryCreate
 
 class CountryModel(Base):
     __tablename__ = "countries"

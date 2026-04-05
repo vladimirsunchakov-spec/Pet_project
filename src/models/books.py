@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .authors import AuthorModel
-
+    from src.schemas.books import BookCreate
 
 class BookModel(Base):
     __tablename__ = "books"

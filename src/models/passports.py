@@ -7,6 +7,7 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .users import UserModel
+    from src.schemas.passports import PassportCreate
 
 
 class PassportModel(Base):
