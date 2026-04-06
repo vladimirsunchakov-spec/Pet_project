@@ -1,0 +1,13 @@
+[33mcommit ff61231605e55d514e7a81c6449cc95077ba848c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m
+Author: Vladimir Sunchakov <vladimiroff777@rambler.ru>
+Date:   Sun Apr 5 13:29:05 2026 +0400
+
+    fix: add missing schema imports to models for TYPE_CHECKING
+
+ src/models/authors.py   | 2 [32m+[m[31m-[m
+ src/models/books.py     | 2 [32m+[m[31m-[m
+ src/models/cities.py    | 2 [32m+[m[31m-[m
+ src/models/countries.py | 2 [32m+[m[31m-[m
+ src/models/passports.py | 1 [32m+[m
+ src/models/users.py     | 2 [32m+[m[31m-[m
+ 6 files changed, 6 insertions(+), 5 deletions(-)

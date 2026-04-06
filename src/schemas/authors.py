@@ -1,17 +1,17 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import date
 from typing import List
 
 
 class BookSchema(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=100)
 
 class AuthorCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
     books: List[BookSchema]
-    birth_date: date | None = None
-    country: str | None = None
+    birth_date: date | None = Field(None, description="birth_date")
+    country: str | None = Field(None, max_length=100)
 
 class AuthorUpdate(AuthorCreate):
     pass

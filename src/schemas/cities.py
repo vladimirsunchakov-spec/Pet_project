@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 
 class CityCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=50)
 
 class CityUpdate(CityCreate):
     pass
