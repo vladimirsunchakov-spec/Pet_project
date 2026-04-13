@@ -1,7 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-from src.exceptions import NotFoundError, ConflictError
+from src.exceptions import (
+    NotFoundError,
+    UserAlreadyHasPassportError,
+    PhoneAlreadyExistsError,
+    UsernameAlreadyExistsError,
+    PassportAlreadyExistsError)
+
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.models.users import UserModel

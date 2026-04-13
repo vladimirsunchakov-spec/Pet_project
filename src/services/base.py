@@ -3,7 +3,12 @@ from typing import Type, Any
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.exceptions import ConflictError
+from src.exceptions import (
+    PhoneAlreadyExistsError,
+    PassportAlreadyExistsError,
+    UserAlreadyHasPassportError,
+    UsernameAlreadyExistsError,
+)
 
 class BaseService:
 
@@ -45,4 +50,11 @@ class BaseService:
                     f"{field_name.capitalize()} already exist",
                     extra={"extra": {field_name: field_value, "request_id": request_id}}
                     )
-            raise ConflictError(field_name.capitalize(), field_value)
+                if field_name == "username":
+                    raise UsernameAlreadyExistsError(field_value)
+                elif field_name == "phone":
+                    raise PhoneAlreadyExistsError(field_value)
+                elif field_name == "passport_number":
+                    raise PassportAlreadyExistsError(field_value)
+                elif field_name == "user_id":
+                    raise UserAlreadyHasPassportError(str(field_value))
