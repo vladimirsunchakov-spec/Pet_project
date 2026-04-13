@@ -9,7 +9,7 @@ class BookSchema(BaseModel):
 
 class AuthorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    books: List[BookSchema]
+    books: List[BookSchema] = Field(min_length=1, max_length=100)
     birth_date: date | None = Field(None, description="birth_date")
     country: str | None = Field(None, max_length=100)
 
