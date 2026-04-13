@@ -5,6 +5,6 @@ from fastapi import APIRouter, status
 router = APIRouter()
 
 
-@router.get('/v1/healthcheck', status_code=status.HTTP_200_OK)
-async def healthcheck():
-    return {"status": "ok"}
+@router.get('/v1/healthcheck', response_model=StatusResponse, status_code=status.HTTP_200_OK)
+async def healthcheck() -> StatusResponse:
+    return StatusResponse(status=StatusEnum.OK)

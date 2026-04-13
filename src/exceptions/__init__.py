@@ -1,4 +1,5 @@
 from .not_found import NotFoundError
+from .request_id import RequestIdNotSetError
 from .username_already_exists import UsernameAlreadyExistsError
 from .phone_already_exists import PhoneAlreadyExistsError
 from .passport_number_already_exists import PassportAlreadyExistsError
@@ -9,5 +10,6 @@ __all__ = [
     "UsernameAlreadyExistsError",
     "PassportAlreadyExistsError",
     "UserAlreadyHasPassportError",
-    "PhoneAlreadyExistsError"
+    "PhoneAlreadyExistsError",
+    "RequestIdNotSetError",
 ]
