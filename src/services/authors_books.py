@@ -22,7 +22,6 @@ class AuthorsBooksService(BaseService):
 
         author = AuthorModel.from_schema(data)
         self.db.add(author)
-        await self.db.flush()
 
         for book_data in data.books:
             book = BookModel.from_schema(book_data)
