@@ -8,12 +8,11 @@ metadata = sa.MetaData()
 class BaseServiceModel:
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
-        default=lambda: datetime.now(timezone.utc)
+        default=datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc)
+        onupdate=datetime.now(timezone.utc)
     )
     is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
 
