@@ -12,16 +12,16 @@ async def create_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_session)):
     service = UsersPassportsService(db=db)
-    user = await service.create_user(data=data)
-    return UserResponse.model_validate(user)
+    result = await service.create_user(data=data)
+    return result
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
     service = UsersPassportsService(db=db)
-    user = await service.get_user(user_id=user_id)
-    return UserResponse.model_validate(user)
+    result = await service.get_user(user_id=user_id)
+    return result
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
@@ -29,8 +29,8 @@ async def update_user(
     data: UserUpdate,
     db: AsyncSession = Depends(get_session)):
     service = UsersPassportsService(db=db)
-    user = await service.update_user(user_id=user_id, data=data)
-    return UserResponse.model_validate(user)
+    result = await service.update_user(user_id=user_id, data=data)
+    return result
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(

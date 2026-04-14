@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
+
+from schemas.authors import AuthorResponse
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError
@@ -30,7 +32,7 @@ class AuthorsBooksService(BaseService):
         await self.db.refresh(author)
 
         self._log_info("Author created", entity_id=author.id, request_id=self.request_id)
-        return author
+        return AuthorResponse.model_validate(author)
 
     async def get_author(self, **kwargs) -> AuthorModel:
         author_id = kwargs.get("author_id")
@@ -44,7 +46,7 @@ class AuthorsBooksService(BaseService):
             self._log_warning("Author not found", entity_id=author_id, request_id=self.request_id)
             raise NotFoundError ("Author", str(author_id))
 
-        return author
+        return AuthorResponse.model_validate(author)
 
     async def update_author(self, **kwargs) -> AuthorModel:
         data = kwargs.get("data")
@@ -64,15 +66,13 @@ class AuthorsBooksService(BaseService):
         await self.db.refresh(author)
 
         self._log_info("Author updated", entity_id=author.id, request_id=self.request_id)
-        return author
+        return AuthorResponse.model_validate(author)
 
     async def delete_author(self, **kwargs) -> None:
         author_id = kwargs.get("author_id")
-
         self._log_info("Deleting author", entity_id=author_id, request_id=self.request_id)
 
         author = await self.get_author(author_id=author_id)
 
         await self.db.delete(author)
-
         self._log_info("Author deleted", entity_id=author.id, request_id=self.request_id)

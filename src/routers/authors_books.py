@@ -12,16 +12,16 @@ async def create_author(
     data: AuthorCreate,
     db: AsyncSession = Depends(get_session)):
     service = AuthorsBooksService(db=db)
-    author = await service.create_author(data=data)
-    return AuthorResponse.model_validate(author)
+    result = await service.create_author(data=data)
+    return result
 
 @router.get("/{author_id}", response_model=AuthorResponse)
 async def get_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
     service = AuthorsBooksService(db=db)
-    author = await service.get_author(author_id=author_id)
-    return AuthorResponse.model_validate(author)
+    result = await service.get_author(author_id=author_id)
+    return result
 
 @router.put("/{author_id}", response_model=AuthorResponse)
 async def update_author(
@@ -29,8 +29,8 @@ async def update_author(
     data: AuthorUpdate,
     db: AsyncSession = Depends(get_session)):
     service = AuthorsBooksService(db=db)
-    author = await service.update_author(author_id=author_id, data=data)
-    return AuthorResponse.model_validate(author)
+    result = await service.update_author(author_id=author_id, data=data)
+    return result
 
 @router.delete("/{author_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_author(

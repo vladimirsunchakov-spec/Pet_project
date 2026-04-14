@@ -13,16 +13,16 @@ async def create_country(
     data: CountryCreate,
     db: AsyncSession = Depends(get_session)):
     service = CountriesCitiesService(db=db)
-    country = await service.create_country(data=data)
-    return CountryResponse.model_validate(country)
+    result = await service.create_country(data=data)
+    return result
 
 @router.get("/{country_id}", response_model=CountryResponse)
 async def get_country(
     country_id: UUID,
     db: AsyncSession = Depends(get_session)):
     service = CountriesCitiesService(db=db)
-    country = await service.get_country(country_id=country_id)
-    return CountryResponse.model_validate(country)
+    result = await service.get_country(country_id=country_id)
+    return result
 
 @router.put("/{country_id}", response_model=CountryResponse)
 async def update_country(
@@ -30,8 +30,8 @@ async def update_country(
     data: CountryUpdate,
     db: AsyncSession = Depends(get_session)):
     service = CountriesCitiesService(db=db)
-    country = await service.update_country(country_id=country_id, data=data)
-    return CountryResponse.model_validate(country)
+    result = await service.update_country(country_id=country_id, data=data)
+    return result
 
 @router.delete("/{country_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_country(

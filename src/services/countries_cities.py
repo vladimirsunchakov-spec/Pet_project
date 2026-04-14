@@ -6,7 +6,8 @@ from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError
 from src.models.countries import CountryModel
 from src.models.cities import CityModel
-from src.schemas.countries import CountryCreate, CountryUpdate
+from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
+
 
 class CountriesCitiesService(BaseService):
     def __init__(self, **kwargs):
@@ -29,7 +30,7 @@ class CountriesCitiesService(BaseService):
 
         self._log_info("Created country", entity_id=country.id, request_id=self.request_id, cities_count=len(data.cities))
 
-        return country
+        return CountryResponse.model_validate(country)
 
     async def get_country(self, **kwargs) -> CountryModel:
         country_id = kwargs.get("country_id")
@@ -43,7 +44,7 @@ class CountriesCitiesService(BaseService):
             self._log_warning("Country not found", entity_id=country_id, request_id=self.request_id)
             raise NotFoundError ("Country", str(country_id))
 
-        return country
+        return CountryResponse.model_validate(country)
 
     async def update_country(self, **kwargs) -> CountryModel:
         country_id = kwargs.get("country_id")
@@ -65,7 +66,7 @@ class CountriesCitiesService(BaseService):
 
         self._log_info("Updated country", entity_id=country_id, request_id=self.request_id, cities_count=len(data.cities))
 
-        return country
+        return CountryResponse.model_validate(country)
 
     async def delete_country(self, **kwargs) -> None:
         country_id = kwargs.get("country_id")

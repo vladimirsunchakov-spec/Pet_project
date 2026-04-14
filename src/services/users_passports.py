@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
+
+from schemas.users import UserResponse
 from src.exceptions import (
     NotFoundError,
     UserAlreadyHasPassportError,
@@ -41,7 +43,7 @@ class UsersPassportsService(BaseService):
         await self.db.refresh(user)
 
         self._log_info("Created user", entity_id=user.id,  request_id=self.request_id)
-        return user
+        return UserResponse.model_validate(user)
 
     async def get_user(self, **kwargs) -> UserModel:
         user_id = kwargs.get("user_id")
@@ -55,7 +57,7 @@ class UsersPassportsService(BaseService):
             self._log_warning("User not found", entity_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
 
-        return user
+        return UserResponse.model_validate(user)
 
     async def update_user(self, **kwargs) -> UserModel:
         user_id = kwargs.get("user_id")
@@ -85,7 +87,7 @@ class UsersPassportsService(BaseService):
         await self.db.refresh(user)
 
         self._log_info("Updated user", entity_id=user.id, request_id=self.request_id)
-        return user
+        return UserResponse.model_validate(user)
 
     async def delete_user(self, **kwargs) -> None:
         user_id = kwargs.get("user_id")
