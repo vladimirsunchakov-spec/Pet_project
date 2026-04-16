@@ -20,7 +20,10 @@ class AuthorsBooksService(BaseService):
 
         author = AuthorModel.from_schema(data)
         self.db.add(author)
-        books = [BookModel.from_schema(book_data) for book_data in data.books]
+        books = []
+        for book_data in data.books:
+            book = BookModel.from_schema(book_data)
+            books.append(book)
         self.db.add_all(books)
         author.books.extend(books)
 

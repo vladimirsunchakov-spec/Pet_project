@@ -20,7 +20,10 @@ class CountriesCitiesService(BaseService):
         country = CountryModel.from_schema(data)
         self.db.add(country)
 
-        cities = [CityModel.from_schema(city_data, country) for city_data in data.cities]
+        cities = []
+        for city_data in data.cities:
+            city = CityModel.from_schema(city_data)
+            cities.append(city)
         self.db.add_all(cities)
 
         await self.db.refresh(country)
