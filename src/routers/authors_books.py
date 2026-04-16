@@ -11,30 +11,27 @@ router = APIRouter(prefix="/v1/authors-books", tags=["Authors & Books"])
 async def create_author(
     data: AuthorCreate,
     db: AsyncSession = Depends(get_session)):
-    service = AuthorsBooksService(db=db)
-    result = await service.create_author(data=data)
-    return result
+
+    return AuthorsBooksService(db=db).create_author(data=data)
 
 @router.get("/{author_id}", response_model=AuthorResponse)
 async def get_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = AuthorsBooksService(db=db)
-    result = await service.get_author(author_id=author_id)
-    return result
+
+    return AuthorsBooksService(db=db).get_author(author_id=author_id)
 
 @router.put("/{author_id}", response_model=AuthorResponse)
 async def update_author(
     author_id: UUID,
     data: AuthorUpdate,
     db: AsyncSession = Depends(get_session)):
-    service = AuthorsBooksService(db=db)
-    result = await service.update_author(author_id=author_id, data=data)
-    return result
+
+    return AuthorsBooksService(db=db).update_author(author_id=author_id, data=data)
 
 @router.delete("/{author_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_author(
     author_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = AuthorsBooksService(db=db)
-    await service.delete_author(author_id=author_id)
+
+    await AuthorsBooksService(db=db).delete_author(author_id=author_id)

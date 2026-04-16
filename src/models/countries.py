@@ -25,3 +25,7 @@ class CountryModel(Base):
         return cls(
             name=data.name,
             continent=data.continent)
+
+    def update_from_schema(self, data: "CountryUpdate") -> None:
+        self.name = data.name
+        self.continent = data.continent

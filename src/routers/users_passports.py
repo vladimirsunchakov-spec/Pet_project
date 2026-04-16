@@ -11,30 +11,27 @@ router = APIRouter(prefix="/v1/users-passports", tags=["Users & Passports"])
 async def create_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_session)):
-    service = UsersPassportsService(db=db)
-    result = await service.create_user(data=data)
-    return result
+
+    return UsersPassportsService(db=db).create_user(data=data)
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = UsersPassportsService(db=db)
-    result = await service.get_user(user_id=user_id)
-    return result
+
+    return UsersPassportsService(db=db).get_user(user_id=user_id)
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: UUID,
     data: UserUpdate,
     db: AsyncSession = Depends(get_session)):
-    service = UsersPassportsService(db=db)
-    result = await service.update_user(user_id=user_id, data=data)
-    return result
+
+    return UsersPassportsService(db=db).update_user(user_id=user_id, data=data)
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = UsersPassportsService(db=db)
-    await service.delete_user(user_id=user_id)
+
+    await UsersPassportsService(db=db).delete_user(user_id=user_id)

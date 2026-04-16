@@ -10,20 +10,18 @@ from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 
 
 class CountriesCitiesService(BaseService):
-    def __init__(self, **kwargs):
-        self.db:AsyncSession = kwargs.get("db")
-        self.request_id: str = kwargs.get("request_id", get_request_id())
+    def __init__(self, db: AsyncSession):
+        self.db:AsyncSession = db
+        self.request_id = get_request_id()
 
-    async def create_country(self, **kwargs) -> CountryModel:
-        data = kwargs.get("data")
+    async def create_country(self, data: CountryCreate) -> CountryResponse:
         self._log_info("Creating country", request_id=self.request_id, name=data.name)
 
         country = CountryModel.from_schema(data)
         self.db.add(country)
 
-        for city_data in data.cities:
-            city = CityModel.from_schema(city_data, country.id)
-            self.db.add(city)
+        cities = [CityModel.from_schema(city_data, country) for city_data in data.cities]
+        self.db.add_all(cities)
 
         await self.db.refresh(country)
 
@@ -31,8 +29,7 @@ class CountriesCitiesService(BaseService):
 
         return CountryResponse.model_validate(country)
 
-    async def get_country(self, **kwargs) -> CountryModel:
-        country_id = kwargs.get("country_id")
+    async def get_country(self, country_id: UUID) -> CountryResponse:
         self._log_info("Fetching country", entity_id=country_id, request_id=self.request_id)
 
         query = select(CountryModel).where(CountryModel.id == country_id)
@@ -45,34 +42,27 @@ class CountriesCitiesService(BaseService):
 
         return CountryResponse.model_validate(country)
 
-    async def update_country(self, **kwargs) -> CountryModel:
-        country_id = kwargs.get("country_id")
-        data = kwargs.get("data")
+    async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
 
         country = await self.get_country(country_id=country_id)
-
-        country.name = data.name
-        country.continent = data.continent
+        country.update_from_schema(data)
 
         for city in country.cities:
             await self.db.delete(city)
+        cities = [CityModel.from_schema(city_data, country) for city_data in data.cities]
+        self.db.add_all(cities)
 
-        for city_data in data.cities:
-            city = CityModel.from_schema(city_data, country.id)
-            self.db.add(city)
         await self.db.refresh(country)
 
         self._log_info("Updated country", entity_id=country_id, request_id=self.request_id, cities_count=len(data.cities))
 
         return CountryResponse.model_validate(country)
 
-    async def delete_country(self, **kwargs) -> None:
-        country_id = kwargs.get("country_id")
+    async def delete_country(self, country_id: UUID) -> None:
         self._log_info("Deleting country", entity_id=country_id, request_id=self.request_id)
 
         country = await self.get_country(country_id=country_id)
-
         await self.db.delete(country)
 
         self._log_info("Deleted country", entity_id=country_id, request_id=self.request_id)

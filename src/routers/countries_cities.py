@@ -12,30 +12,27 @@ router = APIRouter(prefix="/v1/countries-cities", tags=["Countries & Cities"])
 async def create_country(
     data: CountryCreate,
     db: AsyncSession = Depends(get_session)):
-    service = CountriesCitiesService(db=db)
-    result = await service.create_country(data=data)
-    return result
+
+    return CountriesCitiesService(db=db).create_country(data=data)
 
 @router.get("/{country_id}", response_model=CountryResponse)
 async def get_country(
     country_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = CountriesCitiesService(db=db)
-    result = await service.get_country(country_id=country_id)
-    return result
+
+    return CountriesCitiesService(db=db).get_country(country_id=country_id)
 
 @router.put("/{country_id}", response_model=CountryResponse)
 async def update_country(
     country_id: UUID,
     data: CountryUpdate,
     db: AsyncSession = Depends(get_session)):
-    service = CountriesCitiesService(db=db)
-    result = await service.update_country(country_id=country_id, data=data)
-    return result
+
+    return CountriesCitiesService(db=db).update_country(country_id=country_id, data=data)
 
 @router.delete("/{country_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_country(
     country_id: UUID,
     db: AsyncSession = Depends(get_session)):
-    service = CountriesCitiesService(db=db)
-    await service.delete_country(country_id=country_id)
+
+    await CountriesCitiesService(db=db).delete_country(country_id=country_id)

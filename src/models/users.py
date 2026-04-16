@@ -24,3 +24,9 @@ class UserModel(Base):
         return cls(
             username=data.username,
             phone=data.phone)
+
+    def update_from_schema(self, data: "UserCreate") -> None:
+        if data.username is not None:
+            self.username = data.username
+        if data.phone is not None:
+            self.phone = data.phone
