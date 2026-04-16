@@ -45,18 +45,21 @@ class CountriesCitiesService(BaseService):
     async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
 
-        country = await self.get_country(country_id=country_id)
+        country = await self.get_country(country_id)
         country.update_from_schema(data)
 
-        for city in country.cities:
-            await self.db.delete(city)
-        cities = [CityModel.from_schema(city_data, country) for city_data in data.cities]
-        self.db.add_all(cities)
+        if data.add_cities:
+            for city_data in data.add_cities:
+                existing = any(city.name == city_data.name for city in country.cities)
+                if existing:
+                    self._log_warning(f"City '{city_data.name}' already exists in country", entity_id=country_id, request_id=self.request_id)
+                    continue
+                city = CityModel.from_schema(city_data, country)
+                self.db.add(city)
 
         await self.db.refresh(country)
 
         self._log_info("Updated country", entity_id=country_id, request_id=self.request_id, cities_count=len(data.cities))
-
         return CountryResponse.model_validate(country)
 
     async def delete_country(self, country_id: UUID) -> None:

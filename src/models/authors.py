@@ -31,6 +31,9 @@ class AuthorModel(Base):
             country=data.country)
 
     def update_from_schema(self, data: "AuthorUpdate") -> None:
-        self.name = data.name
-        self.birth_date = data.birth_date
-        self.country = data.country
+        if data.name is not None:
+            self.name = data.name
+        if data.birth_date is not None:
+            self.birth_date = data.birth_date
+        if data.country is not None:
+            self.country = data.country

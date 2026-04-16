@@ -14,7 +14,10 @@ class AuthorCreate(BaseModel):
     country: str | None = Field(None, max_length=100)
 
 class AuthorUpdate(AuthorCreate):
-    pass
+    name: str | None = Field(None, min_length=1, max_length=100)
+    birth_date: date | None = Field(None, description="birth_date")
+    country: str | None = Field(None, max_length=100)
+    add_books: List[BookSchema] | None = Field(None, min_length=1, max_length=100)
 
 class AuthorResponse(BaseModel):
     id: UUID

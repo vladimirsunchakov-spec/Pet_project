@@ -10,8 +10,10 @@ class CountryCreate(BaseModel):
     continent: str = Field(min_length=1, max_length=50)
     cities: List[CityNestedSchema]
 
-class CountryUpdate(CountryCreate):
-    pass
+class CountryUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=50)
+    continent: str | None = Field(None, min_length=1, max_length=50)
+    add_cities: List[CityNestedSchema] | None = Field(None, min_length=1, max_length=50)
 
 class CountryResponse(BaseModel):
     id: UUID
