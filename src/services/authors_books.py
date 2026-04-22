@@ -20,12 +20,9 @@ class AuthorsBooksService(BaseService):
 
         author = AuthorModel.from_schema(data)
         self.db.add(author)
-        books = []
+
         for book_data in data.books:
-            book = BookModel.from_schema(book_data)
-            books.append(book)
-        self.db.add_all(books)
-        author.books.extend(books)
+            author.books.append(BookModel.from_schema(book_data))
 
         await self.db.refresh(author)
 

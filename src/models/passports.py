@@ -7,7 +7,7 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .users import UserModel
-    from src.schemas.passports import PassportCreate
+    from src.schemas.passports import PassportCreate, PassportUpdate
 
 
 class PassportModel(Base):
@@ -27,3 +27,7 @@ class PassportModel(Base):
         return cls(
             passport_number=data.passport_number,
             user_id=data.user_id)
+
+    def update_from_schema(self, data: "PassportUpdate") -> None:
+        if data.passport_number is not None:
+            self.passport_number = data.passport_number

@@ -23,3 +23,7 @@ class BookModel(Base):
     def from_schema(cls, data: "BookCreate") -> "BookModel":
         return cls(
             title=data.title)
+
+    def update_from_schema(self, data: "BookUpdate") -> None:
+        if data.title is not None:
+            self.title = data.title

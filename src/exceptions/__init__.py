@@ -7,9 +7,6 @@ from .user_already_has_passport import UserAlreadyHasPassportError
 
 __all__ = [
     "NotFoundError",
-    "UsernameAlreadyExistsError",
-    "PassportAlreadyExistsError",
-    "UserAlreadyHasPassportError",
-    "PhoneAlreadyExistsError",
+    "AlreadyExistsError",
     "RequestIdNotSetError",
 ]
