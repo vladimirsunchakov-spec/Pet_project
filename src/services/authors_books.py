@@ -4,7 +4,7 @@ from uuid import UUID
 
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
-from src.exceptions import NotFoundError
+from src.exceptions import NotFoundError, AlreadyExistsError
 from src.models.authors import AuthorModel
 from src.models.books import BookModel
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
@@ -26,7 +26,7 @@ class AuthorsBooksService(BaseService):
 
         await self.db.refresh(author)
 
-        self._log_info("Author created", entity_id=author.id, request_id=self.request_id)
+        self._log_info("Author created", entity_id=author.id, request_id=self.request_id, books_count=len(data.books))
         return AuthorResponse.model_validate(author)
 
     async def get_author(self, author_id: UUID) -> AuthorResponse:
@@ -49,14 +49,15 @@ class AuthorsBooksService(BaseService):
         author.update_from_schema(data)
 
         if data.add_books:
+            existing_titles = {book.title for book in author.books}
             for book_data in data.add_books:
-                existing = any(book.title == book_data.title for book in author.books)
-                if existing:
+                if book_data.title in existing_titles:
                     self._log_warning("Book already exists", entity_id=author_id, request_id=self.request_id)
-                    continue
-                book = BookModel.from_schema(book_data)
-                self.db.add(book)
-                author.books.append(book)
+                    raise AlreadyExistsError("Book", book_data.title)
+
+            new_books = [BookModel.from_schema(book_data) for book_data in data.add_books]
+            self.db.add_all(new_books)
+            author.books.extend(new_books)
 
         await self.db.refresh(author)
 

@@ -24,12 +24,13 @@ class UsersPassportsService(BaseService):
 
         await self._check_username_uniqueness(data.username)
         await self._check_phone_uniqueness(data.phone)
+        if data.passport:
+            await self._check_passport_uniqueness(data.passport.passport_number)
 
         user = UserModel.from_schema(data)
         self.db.add(user)
 
         if data.passport:
-            await self._check_passport_uniqueness(data.passport.passport_number)
             passport = PassportModel.from_schema(data.passport)
             self.db.add(passport)
             user.passport = passport
