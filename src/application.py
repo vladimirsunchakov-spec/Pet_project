@@ -8,8 +8,13 @@ from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
 
-def get_app() -> FastAPI:
+def register_routes(app: FastAPI) -> None:
+    app.include_router(healthcheck_router)
+    app.include_router(authors_books_router)
+    app.include_router(countries_cities_router)
+    app.include_router(users_passports_router)
 
+def get_app() -> FastAPI:
     setup_logging()
 
     app = FastAPI(
@@ -27,9 +32,5 @@ def get_app() -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
 
-    app.include_router(healthcheck_router)
-    app.include_router(authors_books_router)
-    app.include_router(countries_cities_router)
-    app.include_router(users_passports_router)
-
+    register_routes(app)
     return app
