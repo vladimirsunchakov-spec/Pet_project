@@ -1,18 +1,12 @@
-import uuid
 from contextvars import ContextVar
 from uuid import uuid4
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from exceptions import request_id
-from exceptions.request_id import RequestIdNotSetError
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
 def get_request_id() -> str:
-    request_id = request_id_var.get()
-    if not request_id:
-        raise RequestIdNotSetError()
-    return request_id
+    return request_id_var.get()
 
 def set_request_id(request_id: str) -> None:
     request_id_var.set(request_id)
