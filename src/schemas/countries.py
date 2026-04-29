@@ -5,6 +5,11 @@ from typing import List
 class CityNestedSchema(BaseModel):
     name: str = Field(min_length=1, max_length=50)
 
+    def to_model(self, country: "CountryModel") -> "CityModel":
+        from src.models.cities import CityModel
+        return CityModel(name=self.name, country=country)
+
+
 class CountryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     continent: str = Field(min_length=1, max_length=50)

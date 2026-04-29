@@ -43,7 +43,7 @@ class AuthorsBooksService(BaseService):
         self._log_info("Updating author", entity_id=author_id, request_id=self.request_id)
 
         author = await self.get_author(author_id)
-        author.update_from_schema(data)
+        data.update_model(author)
 
         if data.add_books:
             existing_titles = {book.title for book in author.books}
@@ -52,7 +52,7 @@ class AuthorsBooksService(BaseService):
                     self._log_warning("Book already exists", entity_id=author_id, request_id=self.request_id)
                     raise AlreadyExistsError("Book", book_data.title)
 
-            new_books = [BookModel.from_schema(book_data) for book_data in data.add_books]
+            new_books = [book_data.to_model() for book_data in data.add_books]
             self.db.add_all(new_books)
             author.books.extend(new_books)
 

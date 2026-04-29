@@ -43,7 +43,7 @@ class CountriesCitiesService(BaseService):
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
 
         country = await self.get_country(country_id)
-        country.update_from_schema(data)
+        data.update_model(country)
 
         if data.add_cities:
             existing_names = {city.name for city in country.cities}
@@ -52,7 +52,7 @@ class CountriesCitiesService(BaseService):
                     self._log_error(f"City '{city_data.name}' already exists in country", entity_id=country_id, request_id=self.request_id)
                     raise AlreadyExistsError("City", city_data.name)
 
-            new_cities = [CityModel.from_schema(city_data, country) for city_data in data.add_cities]
+            new_cities = [city_data.to_model(country) for city_data in data.add_cities]
             self.db.add_all(new_cities)
 
         await self.db.refresh(country)

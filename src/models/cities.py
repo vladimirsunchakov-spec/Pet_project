@@ -7,7 +7,6 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .countries import CountryModel
-    from src.schemas.cities import CityCreate, CityUpdate
 
 class CityModel(Base):
     __tablename__ = "cities"
@@ -20,13 +19,3 @@ class CityModel(Base):
 
 
     country: Mapped["CountryModel"] = relationship(back_populates="cities")
-
-    @classmethod
-    def from_schema(cls, data: "CityCreate", country_id: UUID) -> "CityModel":
-        return cls(
-            name=data.name,
-            country_id=country_id)
-
-    def update_from_schema(self, data: "CityUpdate") -> None:
-        if data.name is not None:
-            self.name = data.name

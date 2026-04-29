@@ -7,7 +7,6 @@ from datetime import date
 
 if TYPE_CHECKING:
     from .books import BookModel
-    from src.schemas.authors import AuthorCreate, AuthorUpdate
 
 class AuthorModel(Base):
     __tablename__ = "authors"
@@ -23,17 +22,3 @@ class AuthorModel(Base):
         back_populates="authors",
         cascade="all, delete")
 
-    @classmethod
-    def from_schema(cls, data: "AuthorCreate") -> "AuthorModel":
-        return cls(
-            name=data.name,
-            birth_date=data.birth_date,
-            country=data.country)
-
-    def update_from_schema(self, data: "AuthorUpdate") -> None:
-        if data.name is not None:
-            self.name = data.name
-        if data.birth_date is not None:
-            self.birth_date = data.birth_date
-        if data.country is not None:
-            self.country = data.country

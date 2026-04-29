@@ -6,7 +6,6 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .authors import AuthorModel
-    from src.schemas.books import BookCreate
 
 class BookModel(Base):
     __tablename__ = "books"
@@ -18,12 +17,3 @@ class BookModel(Base):
     authors: Mapped[List["AuthorModel"]] = relationship(
         secondary="author_book",
         back_populates="books")
-
-    @classmethod
-    def from_schema(cls, data: "BookCreate") -> "BookModel":
-        return cls(
-            title=data.title)
-
-    def update_from_schema(self, data: "BookUpdate") -> None:
-        if data.title is not None:
-            self.title = data.title

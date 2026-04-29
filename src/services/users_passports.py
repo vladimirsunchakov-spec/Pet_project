@@ -58,16 +58,16 @@ class UsersPassportsService(BaseService):
         if data.phone is not None and data.phone != user.phone:
             await self._check_phone_uniqueness(data.phone, exclude_id=user.id)
 
-        user.update_from_schema(data)
+        data.update_model(user)
 
         if data.passport is not None:
             if user.passport:
                 if data.passport.passport_number != user.passport.passport_number:
                     await self._check_passport_uniqueness(data.passport.passport_number, exclude_id=user.passport.id)
-                    user.passport.update_from_schema(data.passport)
+                    data.passport.update_model(user.passport)
             else:
                 await self._check_passport_uniqueness(data.passport.passport_number)
-                passport = PassportModel.from_schema(data.passport)
+                passport = data.passport.to_model()
                 self.db.add(passport)
                 user.passport = passport
 

@@ -6,7 +6,6 @@ import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from .cities import CityModel
-    from src.schemas.countries import CountryCreate
 
 class CountryModel(Base):
     __tablename__ = "countries"
@@ -20,14 +19,3 @@ class CountryModel(Base):
         back_populates="country",
         cascade="all, delete-orphan")
 
-    @classmethod
-    def from_schema(cls, data: "CountryCreate") -> "CountryModel":
-        return cls(
-            name=data.name,
-            continent=data.continent)
-
-    def update_from_schema(self, data: "CountryUpdate") -> None:
-        if data.name is not None:
-            self.name = data.name
-        if data.continent is not None:
-            self.continent = data.continent
