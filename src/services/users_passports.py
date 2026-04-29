@@ -27,13 +27,8 @@ class UsersPassportsService(BaseService):
         if data.passport:
             await self._check_passport_uniqueness(data.passport.passport_number)
 
-        user = UserModel.from_schema(data)
+        user = data.to_model()
         self.db.add(user)
-
-        if data.passport:
-            passport = PassportModel.from_schema(data.passport)
-            self.db.add(passport)
-            user.passport = passport
 
         await self.db.refresh(user)
 

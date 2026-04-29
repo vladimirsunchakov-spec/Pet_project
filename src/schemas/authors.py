@@ -13,6 +13,13 @@ class AuthorCreate(BaseModel):
     birth_date: date | None = Field(None, description="birth_date")
     country: str | None = Field(None, max_length=100)
 
+    def to_model(self):
+        from src.models.authors import AuthorModel
+        from src.models.books import BookModel
+        author = AuthorModel(name=self.name, birth_date=self.birth_date, country=self.country)
+        author.books = [BookModel(title=book.title) for book in self.books]
+        return author
+
 class AuthorUpdate(AuthorCreate):
     name: str | None = Field(None, min_length=1, max_length=100)
     birth_date: date | None = Field(None, description="birth_date")

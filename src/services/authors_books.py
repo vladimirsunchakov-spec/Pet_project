@@ -18,11 +18,8 @@ class AuthorsBooksService(BaseService):
     async def create_author(self, data: AuthorCreate) -> AuthorResponse:
         self._log_info("Creating author", request_id=self.request_id, name=data.name)
 
-        author = AuthorModel.from_schema(data)
+        author = data.to_model()
         self.db.add(author)
-
-        for book_data in data.books:
-            author.books.append(BookModel.from_schema(book_data))
 
         await self.db.refresh(author)
 

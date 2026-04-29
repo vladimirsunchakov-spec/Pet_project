@@ -17,11 +17,8 @@ class CountriesCitiesService(BaseService):
     async def create_country(self, data: CountryCreate) -> CountryResponse:
         self._log_info("Creating country", request_id=self.request_id, name=data.name)
 
-        country = CountryModel.from_schema(data)
+        country = data.to_model()
         self.db.add(country)
-
-        for city_data in data.cities:
-            country.cities.append(CityModel.from_schema(city_data, country))
 
         await self.db.refresh(country)
 

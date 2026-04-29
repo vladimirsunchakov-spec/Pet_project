@@ -10,6 +10,14 @@ class CountryCreate(BaseModel):
     continent: str = Field(min_length=1, max_length=50)
     cities: List[CityNestedSchema]
 
+    def to_model(self):
+        from src.models.countries import CountryModel
+        from src.models.cities import CityModel
+
+        country = CountryModel(name=self.name, continent=self.continent)
+        country.cities = [CityModel(name=city.name) for city in self.cities]
+        return country
+
 class CountryUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=50)
     continent: str | None = Field(None, min_length=1, max_length=50)
