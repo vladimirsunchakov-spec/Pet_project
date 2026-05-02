@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from typing import Optional
-from schemas.passports import PassportCreate
+from schemas.passports import PassportCreate, PassportUpdate
 
 
 class UserCreate(BaseModel):
@@ -12,17 +12,15 @@ class UserCreate(BaseModel):
 
     def to_model(self):
         from src.models.users import UserModel
-        from src.models.passports import PassportModel
 
         user = UserModel(username=self.username, phone=self.phone)
         if self.passport:
-            user.passport = PassportModel(passport_number=self.passport.passport_number, user_id=None)
+            user.passport = self.passport.to_model()
         return user
 
-
 class UserUpdate(BaseModel):
-    username: str = Field(min_length=3, max_length=50)
-    phone: str = Field(min_length=3, max_length=50)
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    phone: Optional[str] = Field(None, min_length=3, max_length=50)
     passport: Optional["PassportUpdate"] = None
 
     def update_model(self, user: "UserModel") -> None:
