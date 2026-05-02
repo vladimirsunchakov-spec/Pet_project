@@ -1,14 +1,5 @@
 import logging
-from typing import Type, Any
 from uuid import UUID
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.exceptions import (
-    PhoneAlreadyExistsError,
-    PassportAlreadyExistsError,
-    UserAlreadyHasPassportError,
-    UsernameAlreadyExistsError,
-)
 
 class BaseService:
 
@@ -31,30 +22,3 @@ class BaseService:
         extra = {"entity_id": str(entity_id) if entity_id else None, **kwargs}
         cls._get_logger().warning(message, extra={"extra": extra})
 
-    @classmethod
-    async def _check_uniqueness(
-        cls,
-        db: AsyncSession,
-        model: Type[Any],
-        fields: dict[str, Any],
-        exclude_id: UUID | None = None,
-        request_id: str | None = None
-    ) -> None:
-        for field_name, field_value in fields.items():
-            query = select(model).where(getattr(model, field_name) == field_value)
-            if exclude_id:
-                query = query.where(getattr(model, "id") != exclude_id)
-            result = await db.execute(query)
-            if result.scalar_one_or_none():
-                cls._get_logger().error(
-                    f"{field_name.capitalize()} already exist",
-                    extra={"extra": {field_name: field_value, "request_id": request_id}}
-                    )
-                if field_name == "username":
-                    raise UsernameAlreadyExistsError(field_value)
-                elif field_name == "phone":
-                    raise PhoneAlreadyExistsError(field_value)
-                elif field_name == "passport_number":
-                    raise PassportAlreadyExistsError(field_value)
-                elif field_name == "user_id":
-                    raise UserAlreadyHasPassportError(str(field_value))
