@@ -1,10 +1,21 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
+from src.models.cities import CityModel
 
 class CityCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
 
-class CityUpdate(CityCreate):
+    @field_validator('name')
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        if v.strip():
+            raise ValueError('City name cannot be empty')
+        return v
+
+    def to_model(self, country: "CountryModel") -> "CityModel":
+        return CityModel(name=self.name, country=country)
+
+class CityUpdate(BaseModel):
     pass
 
 class CityResponse(BaseModel):

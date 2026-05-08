@@ -1,12 +1,12 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 from typing import List, Optional
+from src.models.cities import CityModel
+from src.models.countries import CountryModel
 
 class CityNestedSchema(BaseModel):
     name: str = Field(min_length=1, max_length=50)
-
     def to_model(self, country: "CountryModel") -> "CityModel":
-        from src.models.cities import CityModel
         return CityModel(name=self.name, country=country)
 
 
@@ -15,9 +15,21 @@ class CountryCreate(BaseModel):
     continent: str = Field(min_length=1, max_length=50)
     cities: List[CityNestedSchema] = Field(min_length=1, max_length=50)
 
-    def to_model(self):
-        from src.models.countries import CountryModel
+    @field_validator("name", "continent")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Field cannot be empty")
+        return v
 
+    @field_validator("cities")
+    @classmethod
+    def cities_not_empty(cls, v: List[CityNestedSchema]) -> List[CityNestedSchema]:
+        if not v:
+            raise ValueError("At least one city is required")
+        return v
+
+    def to_model(self):
         country = CountryModel(name=self.name, continent=self.continent)
         country.cities = [city.to_model(country) for city in self.cities]
         return country
