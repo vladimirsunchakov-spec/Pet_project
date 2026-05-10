@@ -15,7 +15,7 @@ class BaseServiceModel:
         onupdate=datetime.now(timezone.utc)
     )
     is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
-
+    deleted_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
 
     @classmethod
     def on_conflict_constraint(cls) -> tuple | None:

@@ -50,18 +50,21 @@ class AuthorUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     birth_date: Optional[date] = None
     country: Optional[str] = Field(None, max_length=100)
-    add_books: Optional[List[BookSchema]] = Field(None, max_length=100)
+    books: Optional[List[BookSchema]] = Field(None, max_length=100)
 
     def update_model(self, author: "AuthorModel") -> None:
-        update_data = self.model_dump(exclude_unset=True, exclude={"add_books"})
+        simple_fields = ["name", "birth_date", "country"]
+        update_data = self.model_dump(exclude_unset=True, include=simple_fields)
         for field, value in update_data.items():
             if value is not None:
                 setattr(author, field, value)
-        if self.add_books:
-            new_books = [book.to_model() for book in self.add_books]
-            if author.books is None:
+
+        if self.books is not None:
+            if not self.books:
                 author.books = []
-            author.books.extend(new_books)
+            else:
+                new_books = [book.to_model() for book in self.books]
+                author.books.extend(new_books)
 
 class AuthorResponse(BaseModel):
     id: UUID

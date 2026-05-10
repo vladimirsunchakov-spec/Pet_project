@@ -1,14 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from uuid import UUID
-
+from datetime import datetime, timezone
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError, AlreadyExistsError
 from src.models.authors import AuthorModel
 from src.models.books import BookModel
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
-
+from typing import List
 
 class AuthorsBooksService(BaseService):
     def __init__(self, db: AsyncSession):
@@ -29,7 +29,7 @@ class AuthorsBooksService(BaseService):
     async def get_author(self, author_id: UUID) -> AuthorResponse:
         self._log_info("Fetching author", entity_id=author_id, request_id=self.request_id)
 
-        query = select(AuthorModel).where(AuthorModel.id == author_id)
+        query = select(AuthorModel).where(AuthorModel.id == author_id, AuthorModel.is_deleted == False)
         result = await self.db.execute(query)
         author = result.scalar_one_or_none()
 
@@ -39,32 +39,48 @@ class AuthorsBooksService(BaseService):
 
         return AuthorResponse.model_validate(author)
 
+    async def get_authors(self, skip: int = 0, limit: int = 100) -> List[AuthorResponse]:
+        self._log_info(
+            "Fetching authors", skip=skip, limit=limit, request_id=self.request_id)
+        query = select(AuthorModel).where(AuthorModel.is_deleted == False).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        authors = result.scalars().all()
+
+        return [AuthorResponse.model_validate(author) for author in authors]
+
     async def update_author(self, author_id: UUID, data: AuthorUpdate) -> AuthorResponse:
         self._log_info("Updating author", entity_id=author_id, request_id=self.request_id)
 
         author = await self.get_author(author_id)
-        data.update_model(author)
 
-        if data.add_books:
-            existing_titles = {book.title for book in author.books}
-            for book_data in data.add_books:
-                if book_data.title in existing_titles:
-                    self._log_warning("Book already exists", entity_id=author_id, request_id=self.request_id)
-                    raise AlreadyExistsError("Book", book_data.title)
+        if data.name is not None:
+            author.name = data.name
+        if data.birth_date is not None:
+            author.birth_date = data.birth_date
+        if data.country is not None:
+            author.country = data.country
 
-            new_books = [book_data.to_model() for book_data in data.add_books]
-            self.db.add_all(new_books)
-            author.books.extend(new_books)
-
+        if data.books is not None:
+            if not data.books:
+                author.books = []
+            else:
+                existing_titles = {book.title for book in author.books}
+                new_books = []
+                for book_data in data.books:
+                    if book_data.title in existing_titles:
+                        raise AlreadyExistsError("Book", book_data.title)
+                    new_books.append(book_data.to_model())
+                self.db.add_all(new_books)
+                author.books.extend(new_books)
         await self.db.refresh(author)
-
-        self._log_info("Author updated", entity_id=author.id, request_id=self.request_id, added_book_count=len(data.add_books) if data.add_books else 0)
+        self._log_info("Author updated", entity_id=author_id, request_id=self.request_id)
         return AuthorResponse.model_validate(author)
 
     async def delete_author(self, author_id: UUID) -> None:
         self._log_info("Deleting author", entity_id=author_id, request_id=self.request_id)
 
         author = await self.get_author(author_id=author_id)
+        author.is_deleted = True
+        author.deleted_at = datetime.now(timezone.utc)
 
-        await self.db.delete(author)
         self._log_info("Author deleted", entity_id=author.id, request_id=self.request_id)

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
-
+from typing import List
 from src.services.countries_cities import CountriesCitiesService
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.db import get_session
@@ -21,6 +21,14 @@ async def get_country(
     db: AsyncSession = Depends(get_session)):
 
     return CountriesCitiesService(db=db).get_country(country_id=country_id)
+
+@router.get("/countries", response_model=List[CountryResponse])
+async def get_countries(
+    skip: int = Query(0, ge=0, decription="Количество пропускаемых строк"),
+    limit: int = Query(100, ge=1, le=100, description="Количество записей на странице"),
+    db: AsyncSession = Depends(get_session)):
+    return await CountriesCitiesService(db=db).get_countries(skip=skip, limit=limit)
+
 
 @router.put("/{country_id}", response_model=CountryResponse)
 async def update_country(

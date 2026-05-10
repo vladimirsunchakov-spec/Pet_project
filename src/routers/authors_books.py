@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from src.services.authors_books import AuthorsBooksService
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from src.db import get_session
+from typing import List
 
 router = APIRouter(prefix="/v1/authors-books", tags=["Authors & Books"])
 
@@ -20,6 +21,14 @@ async def get_author(
     db: AsyncSession = Depends(get_session)):
 
     return AuthorsBooksService(db=db).get_author(author_id=author_id)
+
+@router.get("/authors", response_model=List[AuthorResponse])
+async def get_authors(
+    skip: int = Query(0, ge=0, description="Количество пропускаемых записей"),
+    limit: int = Query(100, ge=0, le=1000, description="Количество записей на странице"),
+    db: AsyncSession = Depends(get_session)):
+
+    return await AuthorsBooksService(db=db).get_authors(skip=skip, limit=limit)
 
 @router.put("/{author_id}", response_model=AuthorResponse)
 async def update_author(

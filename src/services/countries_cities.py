@@ -1,3 +1,5 @@
+from datetime import timezone, datetime
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
@@ -29,7 +31,7 @@ class CountriesCitiesService(BaseService):
     async def get_country(self, country_id: UUID) -> CountryResponse:
         self._log_info("Fetching country", entity_id=country_id, request_id=self.request_id)
 
-        query = select(CountryModel).where(CountryModel.id == country_id)
+        query = select(CountryModel).where(CountryModel.id == country_id, CountryModel.is_deleted == False)
         result = await self.db.execute(query)
         country = result.scalar_one_or_none()
 
@@ -38,6 +40,14 @@ class CountriesCitiesService(BaseService):
             raise NotFoundError("Country", str(country_id))
 
         return CountryResponse.model_validate(country)
+
+    async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
+        self._log_info("Fetching countries",request_id=self.request_id, skip=skip, limit=limit)
+        query = select(CountryModel).where(CountryModel.is_deleted == False).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        countries = result.scalars().all()
+
+        return [CountryResponse.model_validate(country) for country in countries]
 
     async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
@@ -64,6 +74,7 @@ class CountriesCitiesService(BaseService):
         self._log_info("Deleting country", entity_id=country_id, request_id=self.request_id)
 
         country = await self.get_country(country_id=country_id)
-        await self.db.delete(country)
+        country.is_deleted = True
+        country.deleted_at = datetime.now(timezone.utc)
 
         self._log_info("Deleted country", entity_id=country_id, request_id=self.request_id)

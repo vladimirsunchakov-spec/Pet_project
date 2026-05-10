@@ -1,7 +1,8 @@
+from datetime import datetime, timezone
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-
 from schemas.users import UserResponse
 from src.exceptions import (
     NotFoundError,
@@ -38,7 +39,7 @@ class UsersPassportsService(BaseService):
     async def get_user(self, user_id: UUID) -> UserResponse:
         self._log_info("Fetching user", entity_id=user_id, request_id=self.request_id)
 
-        query = select(UserModel).where(UserModel.id == user_id)
+        query = select(UserModel).where(UserModel.id == user_id, UserModel.is_deleted == False)
         result = await self.db.execute(query)
         user =  result.scalar_one_or_none()
 
@@ -47,6 +48,14 @@ class UsersPassportsService(BaseService):
             raise NotFoundError("User", str(user_id))
 
         return UserResponse.model_validate(user)
+
+    async def get_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
+        self._log_info("Fetching users", skip=skip, limit=limit, request_id=self.request_id)
+        query = select(UserModel).where(UserModel.is_deleted ==False).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        users = result.scalars().all()
+
+        return [UserModel.model_validate(user) for user in users]
 
     async def update_user(self, user_id: UUID, data:UserUpdate) -> UserResponse:
         self._log_info("Updating user", entity_id=user_id, request_id=self.request_id)
@@ -80,7 +89,8 @@ class UsersPassportsService(BaseService):
         self._log_info("Deleting user", entity_id=user_id, request_id=self.request_id)
 
         user = await self.get_user(user_id=user_id)
-        await self.db.delete(user)
+        user.is_deleted = True
+        user.deleted_at = datetime.now(timezone.utc)
 
         self._log_info("Deleted user", entity_id=user.id, request_id=self.request_id)
 
