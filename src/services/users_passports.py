@@ -23,11 +23,6 @@ class UsersPassportsService(BaseService):
     async def create_user(self, data: UserCreate) -> UserResponse:
         self._log_info("Creating user", request_id=self.request_id, username=data.username, phone=data.phone)
 
-        await self._check_username_uniqueness(data.username)
-        await self._check_phone_uniqueness(data.phone)
-        if data.passport:
-            await self._check_passport_uniqueness(data.passport.passport_number)
-
         user = data.to_model()
         self.db.add(user)
 
@@ -61,24 +56,7 @@ class UsersPassportsService(BaseService):
         self._log_info("Updating user", entity_id=user_id, request_id=self.request_id)
 
         user = await self.get_user(user_id=user_id)
-
-        if data.username is not None and data.username != user.username:
-            await self._check_username_uniqueness(data.username, exclude_id=user.id)
-        if data.phone is not None and data.phone != user.phone:
-            await self._check_phone_uniqueness(data.phone, exclude_id=user.id)
-
         data.update_model(user)
-
-        if data.passport is not None:
-            if user.passport:
-                if data.passport.passport_number != user.passport.passport_number:
-                    await self._check_passport_uniqueness(data.passport.passport_number, exclude_id=user.passport.id)
-                    data.passport.update_model(user.passport)
-            else:
-                await self._check_passport_uniqueness(data.passport.passport_number)
-                passport = data.passport.to_model()
-                self.db.add(passport)
-                user.passport = passport
 
         await self.db.refresh(user)
 
@@ -93,27 +71,3 @@ class UsersPassportsService(BaseService):
         user.deleted_at = datetime.now(timezone.utc)
 
         self._log_info("Deleted user", entity_id=user.id, request_id=self.request_id)
-
-    async def _check_username_uniqueness(self, username: str, exclude_id: UUID | None = None) -> None:
-        query = select(UserModel).where(UserModel.username == username)
-        if exclude_id:
-            query = query.where(UserModel.id != exclude_id)
-        result = await self.db.execute(query)
-        if result.scalar_one_or_none():
-            raise AlreadyExistsError("Username", username)
-
-    async def _check_phone_uniqueness(self, phone: str, exclude_id: UUID | None = None) -> None:
-        query = select(UserModel).where(UserModel.phone == phone)
-        if exclude_id:
-            query = query.where(UserModel.id != exclude_id)
-        result = await self.db.execute(query)
-        if result.scalar_one_or_none():
-            raise AlreadyExistsError("Phone", phone)
-
-    async def _check_passport_uniqueness(self, passport_number: str, exclude_id: UUID | None = None) -> None:
-        query = select(PassportModel).where(PassportModel.passport_number == passport_number)
-        if exclude_id:
-            query = query.where(PassportModel.id != exclude_id)
-        result = await self.db.execute(query)
-        if result.scalar_one_or_none():
-            raise AlreadyExistsError("Passport number", passport_number)
