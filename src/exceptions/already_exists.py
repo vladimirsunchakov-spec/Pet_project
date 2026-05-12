@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from typing import Optional
+from .base import BaseHTTPException
 
-class AlreadyExistsError(HTTPException):
+class AlreadyExistsError(BaseHTTPException):
     def __init__(self, field: str, value: str, detail: Optional[str] = None) -> None:
         if detail is None:
             detail = f"{field}' {value}' already exists."
