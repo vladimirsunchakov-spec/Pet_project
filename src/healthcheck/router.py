@@ -1,10 +1,10 @@
 from src.schemas.base import StatusResponse
-from src.core.enums import StatusEnum
-from fastapi import APIRouter, status
+from fastapi import APIRouter
+from http import HTTPStatus
 
 router = APIRouter()
 
 
-@router.get('/v1/healthcheck', response_model=StatusResponse, status_code=status.HTTP_200_OK)
+@router.get('/v1/healthcheck', response_model=StatusResponse, status_code=HTTPStatus.OK)
 async def healthcheck() -> StatusResponse:
-    return StatusResponse(status="ok")
+    return StatusResponse(status=HTTPStatus.OK.phrase.lower())
