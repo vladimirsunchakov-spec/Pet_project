@@ -4,7 +4,7 @@ from datetime import date
 from typing import List, Optional
 from src.models.authors import AuthorModel
 from src.models.books import BookModel
-
+from src.exceptions import ValidationError
 
 class BookSchema(BaseModel):
     title: str = Field(min_length=1, max_length=100)
@@ -21,14 +21,14 @@ class AuthorCreate(BaseModel):
     @classmethod
     def name_not_empty(cls, v: str) -> str:
         if not v.strip():
-            raise ValueError("Author name cannot be empty")
+            raise ValidationError("Author name cannot be empty")
         return v
 
     @field_validator("books")
     @classmethod
     def books_not_empty(cls, v: List[BookSchema]) -> List[BookSchema]:
         if not v:
-            raise ValueError("At least one book is required")
+            raise ValidationError("At least one book is required")
         return v
 
     @field_validator("birth_date")
@@ -36,9 +36,9 @@ class AuthorCreate(BaseModel):
     def validate_birth_date(cls, v: Optional[date]) -> Optional[date]:
         if v is not None:
             if v > date.today():
-                raise ValueError("Birth date cannot be in the future")
+                raise ValidationError("Birth date cannot be in the future")
             if v < date(1900, 1, 1):
-                raise ValueError("Birth date is too old (year must be >= 1900)")
+                raise ValidationError("Birth date is too old (year must be >= 1900)")
         return v
 
     def to_model(self) -> "AuthorModel":
@@ -60,11 +60,7 @@ class AuthorUpdate(BaseModel):
                 setattr(author, field, value)
 
         if self.books is not None:
-            if not self.books:
-                author.books = []
-            else:
-                new_books = [book.to_model() for book in self.books]
-                author.books.extend(new_books)
+            author.books = [book.to_model() for book in self.books]
 
 class AuthorResponse(BaseModel):
     id: UUID

@@ -1,12 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, update
 from uuid import UUID
 from datetime import datetime, timezone
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError, AlreadyExistsError
 from src.models.authors import AuthorModel
-from src.models.books import BookModel
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from typing import List
 
@@ -40,11 +39,17 @@ class AuthorsBooksService(BaseService):
         return AuthorResponse.model_validate(author)
 
     async def get_authors(self, skip: int = 0, limit: int = 100) -> List[AuthorResponse]:
-        self._log_info(
-            "Fetching authors", skip=skip, limit=limit, request_id=self.request_id)
-        query = select(AuthorModel).where(AuthorModel.is_deleted == False).offset(skip).limit(limit)
-        result = await self.db.execute(query)
-        authors = result.scalars().all()
+        self._log_info("Fetching authors", skip=skip, limit=limit, request_id=self.request_id)
+        async with self.db.begin():
+            query = (
+                select(AuthorModel)
+                .where(AuthorModel.is_deleted == False)
+                .offset(skip)
+                .limit(limit)
+                .with_for_update()
+            )
+            result = await self.db.execute(query)
+            authors = result.scalars().all()
 
         return [AuthorResponse.model_validate(author) for author in authors]
 
@@ -79,8 +84,6 @@ class AuthorsBooksService(BaseService):
     async def delete_author(self, author_id: UUID) -> None:
         self._log_info("Deleting author", entity_id=author_id, request_id=self.request_id)
 
-        author = await self.get_author(author_id=author_id)
-        author.is_deleted = True
-        author.deleted_at = datetime.now(timezone.utc)
-
-        self._log_info("Author deleted", entity_id=author.id, request_id=self.request_id)
+        stmt = (update(AuthorModel).where(AuthorModel.id == author_id).values(is_deleted=True, deleted_at=datetime.now(timezone.utc)))
+        await self.db.execute(stmt)
+        self._log_info("Author deleted", entity_id=author_id, request_id=self.request_id)

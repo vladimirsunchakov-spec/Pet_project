@@ -5,6 +5,8 @@ from typing import Optional
 from schemas.passports import PassportCreate, PassportUpdate
 from src.models.users import UserModel
 from src.models.passports import PassportModel
+from src.exceptions import ValidationError
+
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     phone: PhoneNumber
@@ -14,7 +16,7 @@ class UserCreate(BaseModel):
     @classmethod
     def username_not_empty(cls, v: str) -> str:
         if not v.strip():
-            raise ValueError("Username cannot be empty")
+            raise ValidationError("Username cannot be empty")
         return v
 
     def to_model(self):

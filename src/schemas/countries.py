@@ -3,6 +3,7 @@ from uuid import UUID
 from typing import List, Optional
 from src.models.cities import CityModel
 from src.models.countries import CountryModel
+from src.exceptions import ValidationError
 
 class CityNestedSchema(BaseModel):
     name: str = Field(min_length=1, max_length=50)
@@ -15,18 +16,25 @@ class CountryCreate(BaseModel):
     continent: str = Field(min_length=1, max_length=50)
     cities: List[CityNestedSchema] = Field(min_length=1, max_length=50)
 
-    @field_validator("name", "continent")
+    @field_validator("name")
     @classmethod
-    def not_empty(cls, v: str) -> str:
+    def name_not_empty(cls, v: str) -> str:
         if not v.strip():
-            raise ValueError("Field cannot be empty")
+            raise ValidationError("Country name cannot be empty")
+        return v
+
+    @field_validator("continent")
+    @classmethod
+    def continent_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValidationError("Continent cannot be empty")
         return v
 
     @field_validator("cities")
     @classmethod
     def cities_not_empty(cls, v: List[CityNestedSchema]) -> List[CityNestedSchema]:
         if not v:
-            raise ValueError("At least one city is required")
+            raise ValidationError("At least one city is required")
         return v
 
     def to_model(self):

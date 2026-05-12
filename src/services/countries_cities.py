@@ -1,13 +1,12 @@
 from datetime import timezone, datetime
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from uuid import UUID
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError, AlreadyExistsError
 from src.models.countries import CountryModel
-from src.models.cities import CityModel
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 
 
@@ -43,9 +42,16 @@ class CountriesCitiesService(BaseService):
 
     async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
         self._log_info("Fetching countries",request_id=self.request_id, skip=skip, limit=limit)
-        query = select(CountryModel).where(CountryModel.is_deleted == False).offset(skip).limit(limit)
-        result = await self.db.execute(query)
-        countries = result.scalars().all()
+        async with self.db.begin():
+            query = (
+                select(CountryModel)
+                .where(CountryModel.is_deleted == False)
+                .offset(skip)
+                .limit(limit)
+                .with_for_update()
+            )
+            result = await self.db.execute(query)
+            countries = result.scalars().all()
 
         return [CountryResponse.model_validate(country) for country in countries]
 
@@ -73,8 +79,6 @@ class CountriesCitiesService(BaseService):
     async def delete_country(self, country_id: UUID) -> None:
         self._log_info("Deleting country", entity_id=country_id, request_id=self.request_id)
 
-        country = await self.get_country(country_id=country_id)
-        country.is_deleted = True
-        country.deleted_at = datetime.now(timezone.utc)
-
+        stmt = (update(CountryModel).where(CountryModel.id == country_id).values(is_deleted=True, deleted_at=datetime.now(timezone.utc)))
+        await self.db.execute(stmt)
         self._log_info("Deleted country", entity_id=country_id, request_id=self.request_id)
