@@ -69,5 +69,9 @@ class AuthorResponse(BaseModel):
     birth_date: Optional[date]
     country: Optional[str]
 
+    @classmethod
+    def from_model_list(cls, models: List[AuthorModel]) -> List["AuthorResponse"]:
+        return [cls.model_validate(model) for model in models]
+
     class Config:
         from_attributes = True

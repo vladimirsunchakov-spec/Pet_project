@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 from uuid import UUID
 
 from models.authors import AuthorModel
+from schemas.authors import AuthorResponse
 from schemas.users import UserResponse
 from src.exceptions import NotFoundError
 from src.services.base import BaseService
@@ -49,12 +50,12 @@ class UsersPassportsService(BaseService):
             select(UserModel)
             .where(UserModel.is_deleted == False)
             .offset(skip).limit(limit)
-            .with_for_update()
+            .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)
         users = result.scalars().all()
 
-        return [UserModel.model_validate(user) for user in users]
+        return AuthorResponse.from_model_list(users)
 
     async def update_user(self, user_id: UUID, data:UserUpdate) -> UserResponse:
         self._log_info("Updating user", entity_id=user_id, request_id=self.request_id)

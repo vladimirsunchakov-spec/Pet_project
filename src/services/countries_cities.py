@@ -47,12 +47,12 @@ class CountriesCitiesService(BaseService):
             .where(CountryModel.is_deleted == False)
             .offset(skip)
             .limit(limit)
-            .with_for_update()
+            .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)
         countries = result.scalars().all()
 
-        return [CountryResponse.model_validate(country) for country in countries]
+        return CountryResponse.from_model_list(countries)
 
     async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)

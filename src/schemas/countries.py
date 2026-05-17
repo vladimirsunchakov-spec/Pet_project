@@ -37,7 +37,7 @@ class CountryCreate(BaseModel):
             raise ValidationError("At least one city is required")
         return v
 
-    def to_model(self):
+    def to_model(self) -> "CountryModel":
         country = CountryModel(name=self.name, continent=self.continent)
         country.cities = [city.to_model(country) for city in self.cities]
         return country
@@ -48,16 +48,19 @@ class CountryUpdate(BaseModel):
     add_cities: Optional[List[CityNestedSchema]] = Field(None, max_length=50)
 
     def update_model(self, country: "CountryModel") -> None:
-        if self.name is not None:
-            country.name = self.name
-        if self.continent is not None:
-            country.continent = self.continent
+        update_data = self.model_dump(exclude_unset=True, include={"name", "continent"})
+        for field, value in update_data.items():
+            setattr(country, field, value)
 
 class CountryResponse(BaseModel):
     id: UUID
     name: str
     continent: str
     cities: List[CityNestedSchema]
+
+    @classmethod
+    def from_model_list(cls, models: List[CountryModel]) -> List["CountryResponse"]:
+        return [cls.model_validate(model) for model in models]
 
     class Config:
         from_attributes = True

@@ -45,38 +45,21 @@ class AuthorsBooksService(BaseService):
             .where(AuthorModel.is_deleted == False)
             .offset(skip)
             .limit(limit)
-            .with_for_update()
+            .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)
         authors = result.scalars().all()
 
-        return [AuthorResponse.model_validate(author) for author in authors]
+        return AuthorResponse.from_model_list(authors)
 
     async def update_author(self, author_id: UUID, data: AuthorUpdate) -> AuthorResponse:
         self._log_info("Updating author", entity_id=author_id, request_id=self.request_id)
 
         author = await self.get_author(author_id)
+        data.update_model(author)
 
-        if data.name is not None:
-            author.name = data.name
-        if data.birth_date is not None:
-            author.birth_date = data.birth_date
-        if data.country is not None:
-            author.country = data.country
-
-        if data.books is not None:
-            if not data.books:
-                author.books = []
-            else:
-                existing_titles = {book.title for book in author.books}
-                new_books = []
-                for book_data in data.books:
-                    if book_data.title in existing_titles:
-                        raise AlreadyExistsError("Book", book_data.title)
-                    new_books.append(book_data.to_model())
-                self.db.add_all(new_books)
-                author.books.extend(new_books)
         await self.db.refresh(author)
+
         self._log_info("Author updated", entity_id=author_id, request_id=self.request_id)
         return AuthorResponse.model_validate(author)
 
