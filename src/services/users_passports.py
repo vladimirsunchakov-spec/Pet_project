@@ -45,13 +45,12 @@ class UsersPassportsService(BaseService):
 
     async def get_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
         self._log_info("Fetching users", skip=skip, limit=limit, request_id=self.request_id)
-        async with self.db.begin():
-            query = (
-                select(UserModel)
-                .where(UserModel.is_deleted == False)
-                .offset(skip).limit(limit)
-                .with_for_update()
-            )
+        query = (
+            select(UserModel)
+            .where(UserModel.is_deleted == False)
+            .offset(skip).limit(limit)
+            .with_for_update()
+        )
         result = await self.db.execute(query)
         users = result.scalars().all()
 

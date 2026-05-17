@@ -42,16 +42,15 @@ class CountriesCitiesService(BaseService):
 
     async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
         self._log_info("Fetching countries",request_id=self.request_id, skip=skip, limit=limit)
-        async with self.db.begin():
-            query = (
-                select(CountryModel)
-                .where(CountryModel.is_deleted == False)
-                .offset(skip)
-                .limit(limit)
-                .with_for_update()
-            )
-            result = await self.db.execute(query)
-            countries = result.scalars().all()
+        query = (
+            select(CountryModel)
+            .where(CountryModel.is_deleted == False)
+            .offset(skip)
+            .limit(limit)
+            .with_for_update()
+        )
+        result = await self.db.execute(query)
+        countries = result.scalars().all()
 
         return [CountryResponse.model_validate(country) for country in countries]
 

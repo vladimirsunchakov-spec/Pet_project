@@ -40,16 +40,15 @@ class AuthorsBooksService(BaseService):
 
     async def get_authors(self, skip: int = 0, limit: int = 100) -> List[AuthorResponse]:
         self._log_info("Fetching authors", skip=skip, limit=limit, request_id=self.request_id)
-        async with self.db.begin():
-            query = (
-                select(AuthorModel)
-                .where(AuthorModel.is_deleted == False)
-                .offset(skip)
-                .limit(limit)
-                .with_for_update()
-            )
-            result = await self.db.execute(query)
-            authors = result.scalars().all()
+        query = (
+            select(AuthorModel)
+            .where(AuthorModel.is_deleted == False)
+            .offset(skip)
+            .limit(limit)
+            .with_for_update()
+        )
+        result = await self.db.execute(query)
+        authors = result.scalars().all()
 
         return [AuthorResponse.model_validate(author) for author in authors]
 
