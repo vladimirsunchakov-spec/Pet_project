@@ -44,10 +44,7 @@ class UserUpdate(BaseModel):
             setattr(user, field, value)
 
         if self.passport:
-            if user.passport is None:
-                user.passport = self.passport.to_model()
-            else:
-                user.passport.passport_number = self.passport.passport_number
+            user.passport = self.passport.to_model()
 
 class UserResponse(BaseModel):
     id: UUID
