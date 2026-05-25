@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from uuid import UUID
-
 from models.authors import AuthorModel
 from schemas.authors import AuthorResponse
 from schemas.users import UserResponse
@@ -34,7 +34,9 @@ class UsersPassportsService(BaseService):
     async def get_user(self, user_id: UUID) -> UserResponse:
         self._log_info("Fetching user", entity_id=user_id, request_id=self.request_id)
 
-        query = select(UserModel).where(UserModel.id == user_id, UserModel.is_deleted == False)
+        query = (select(UserModel)
+                 .where(UserModel.id == user_id, UserModel.is_deleted == False)
+                 .options(selectinload(UserModel.passport)))
         result = await self.db.execute(query)
         user =  result.scalar_one_or_none()
 
@@ -50,6 +52,7 @@ class UsersPassportsService(BaseService):
             select(UserModel)
             .where(UserModel.is_deleted == False)
             .offset(skip).limit(limit)
+            .options(selectinload(UserModel.passport))
             .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)

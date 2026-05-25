@@ -2,6 +2,7 @@ from datetime import timezone, datetime
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
@@ -30,7 +31,9 @@ class CountriesCitiesService(BaseService):
     async def get_country(self, country_id: UUID) -> CountryResponse:
         self._log_info("Fetching country", entity_id=country_id, request_id=self.request_id)
 
-        query = select(CountryModel).where(CountryModel.id == country_id, CountryModel.is_deleted == False)
+        query = (select(CountryModel)
+                 .where(CountryModel.id == country_id, CountryModel.is_deleted == False)
+                 .options(selectinload(CountryModel.cities)))
         result = await self.db.execute(query)
         country = result.scalar_one_or_none()
 
@@ -42,11 +45,13 @@ class CountriesCitiesService(BaseService):
 
     async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
         self._log_info("Fetching countries",request_id=self.request_id, skip=skip, limit=limit)
+
         query = (
             select(CountryModel)
             .where(CountryModel.is_deleted == False)
             .offset(skip)
             .limit(limit)
+            .options(selectinload(CountryModel.cities))
             .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)

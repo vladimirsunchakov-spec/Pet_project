@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 from datetime import datetime, timezone
 from src.services.base import BaseService
@@ -28,7 +29,9 @@ class AuthorsBooksService(BaseService):
     async def get_author(self, author_id: UUID) -> AuthorResponse:
         self._log_info("Fetching author", entity_id=author_id, request_id=self.request_id)
 
-        query = select(AuthorModel).where(AuthorModel.id == author_id, AuthorModel.is_deleted == False)
+        query = (select(AuthorModel)
+                 .where(AuthorModel.id == author_id, AuthorModel.is_deleted == False)
+                 .options(selectinload(AuthorModel.books)))
         result = await self.db.execute(query)
         author = result.scalar_one_or_none()
 
@@ -45,6 +48,7 @@ class AuthorsBooksService(BaseService):
             .where(AuthorModel.is_deleted == False)
             .offset(skip)
             .limit(limit)
+            .options(selectinload(AuthorModel.books))
             .with_for_update(skip_locked=True)
         )
         result = await self.db.execute(query)
