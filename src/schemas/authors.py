@@ -52,7 +52,7 @@ class AuthorUpdate(BaseModel):
     country: Optional[str] = Field(None, max_length=100)
     books: Optional[List[BookSchema]] = Field(None, max_length=100)
 
-    def update_model(self, author: "AuthorModel") -> None:
+    def update_model(self, author: AuthorModel) -> None:
         simple_fields = ["name", "birth_date", "country"]
         update_data = self.model_dump(exclude_unset=True, include=simple_fields)
         for field, value in update_data.items():

@@ -38,7 +38,31 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, min_length=3, max_length=50)
     passport: Optional["PassportUpdate"] = None
 
-    def update_model(self, user: "UserModel") -> None:
+    @field_validator("username")
+    @classmethod
+    def username_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValidationError("Username cannot be empty if provided")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> Optional[str]:
+        if v is not None:
+            if not v.strip():
+                raise ValidationError("Phone number cannot be empty if provided")
+            if not v.startswith("+") or not v[1:].isdigit():
+                raise ValidationError("Phone number must be in E.164 format (e.g. +79123456789)")
+        return v
+
+    @field_validator("passport")
+    @classmethod
+    def validate_passport(cls, v: Optional[PassportUpdate]) -> Optional[PassportUpdate]:
+        if v is not None and (not v.passport_number or not v.passport_number.strip()):
+            raise ValidationError("Passport number cannot be empty if provided")
+        return v
+
+    def update_model(self, user: UserModel) -> None:
         update_data = self.model_dump(exclude_unset=True, exclude={"passport"})
         for field, value in update_data.items():
             setattr(user, field, value)

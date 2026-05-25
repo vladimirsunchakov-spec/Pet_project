@@ -10,7 +10,6 @@ class CityNestedSchema(BaseModel):
     def to_model(self, country: "CountryModel") -> "CityModel":
         return CityModel(name=self.name, country=country)
 
-
 class CountryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     continent: str = Field(min_length=1, max_length=50)
@@ -47,10 +46,14 @@ class CountryUpdate(BaseModel):
     continent: Optional[str] = Field(None, min_length=1, max_length=50)
     add_cities: Optional[List[CityNestedSchema]] = Field(None, max_length=50)
 
-    def update_model(self, country: "CountryModel") -> None:
+    def update_model(self, country: CountryModel) -> None:
         update_data = self.model_dump(exclude_unset=True, include={"name", "continent"})
         for field, value in update_data.items():
             setattr(country, field, value)
+
+        if self.add_cities is not None:
+            new_cities = [city.to_model(country) for city in self.add_cities]
+            country.cities.extend(new_cities)
 
 class CountryResponse(BaseModel):
     id: UUID
