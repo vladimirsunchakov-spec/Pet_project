@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 from pydantic_extra_types.phone_numbers import PhoneNumber
 from typing import Optional, List
-from schemas.passports import PassportCreate, PassportUpdate
+from src.schemas.passports import PassportCreate, PassportUpdate
 from src.models.users import UserModel
 from src.models.passports import PassportModel
 from src.exceptions import ValidationError

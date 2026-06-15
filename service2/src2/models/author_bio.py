@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import Integer, String, Float
 from uuid import UUID
-from src.models.base import Base
+from service2.src2.models.base import Base
 
 class AuthorBio(Base):
     __tablename__ = 'author_bio'

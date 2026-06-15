@@ -12,6 +12,7 @@ class BaseServiceModel:
     )
     updated_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
+        default=datetime.now(timezone.utc),
         onupdate=datetime.now(timezone.utc)
     )
     is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
