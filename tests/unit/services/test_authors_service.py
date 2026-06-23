@@ -3,9 +3,6 @@ from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 import pytest
 from uuid import uuid4
 from datetime import date
-
-from poetry.console.commands import self
-
 from src.services.authors_books import AuthorsBooksService
 from src.schemas.authors import AuthorCreate, AuthorUpdate, BookSchema
 from src.exceptions import NotFoundError

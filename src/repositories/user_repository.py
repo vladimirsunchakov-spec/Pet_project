@@ -3,7 +3,6 @@ from uuid import UUID
 from sqlalchemy import select, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
 from src.models.passports import PassportModel
 from src.models.users import UserModel
 from src.repositories.base import BaseRepository
