@@ -9,16 +9,19 @@ from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
 from contextlib import asynccontextmanager
+import logging
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await redis_client.initialize()
-    print("Redis connection")
+    logger.info("Redis connection")
 
     yield
 
     await redis_client.close()
-    print("Redis connection closed")
+    logger.info("Redis connection closed")
 
 def register_routes(app: FastAPI) -> None:
     app.include_router(healthcheck_router)

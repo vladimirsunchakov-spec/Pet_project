@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from src.models.books import BookModel
 from src.models.authors import AuthorModel
 from src.repositories.base import BaseRepository
 import logging
@@ -13,45 +14,58 @@ class AuthorRepository(BaseRepository[AuthorModel]):
     def __init__(self, db: AsyncSession):
         super().__init__(db, AuthorModel)
 
-    async def get_with_books(self, id: UUID, request_id: Optional[str] = None) -> Optional[AuthorModel]:
-        logger.info(f"Getting author {id} with books | request_id={request_id}")
-        query = (
-            select(AuthorModel)
-            .where(AuthorModel.id == id, AuthorModel.is_deleted == False)
-            .options(selectinload(AuthorModel.books))
+    async def get_with_relations(self, id: UUID, relations: Optional[List[str]] = None) -> Optional[AuthorModel]:
+        logger.info(f"Getting author {id} with relations {relations}")
+        query = select(AuthorModel).where(
+            AuthorModel.id == id,
+            AuthorModel.is_deleted == False
         )
+
+        if relations:
+            options = [selectinload(getattr(AuthorModel, rel)) for rel in relations]
+            query = query.options(*options)
+
         result = await self.db.execute(query)
-        return result.scalar_one_or_none()
+        author = result.scalar_one_or_none()
+        if author:
+            logger.info(f"Author {id} found")
+        else:
+            logger.warning(f"Author {id} not found")
+        return author
 
-    def get_all_with_books_query(self, skip: int = 0, limit: int = 100) -> Select:
-        return (
-            select(AuthorModel)
-            .where(AuthorModel.is_deleted == False)
-            .offset(skip)
-            .limit(limit)
-            .options(selectinload(AuthorModel.books))
-        )
+    async def get_with_books(self, id: UUID) -> Optional[AuthorModel]:
+        return await self.get_with_relations(id, relations=["books"])
 
-    async def get_all_with_books(self, skip: int = 0, limit: int = 100, request_id: Optional [str] = None) -> List[AuthorModel]:
-        logger.info(f"Getting all author with books (skip={skip}, limit={limit}) | request_id={request_id}")
+    async def get_all_with_relations(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        relations: Optional[List[str]] = None,
+        for_update: bool = False
+    ) -> List[AuthorModel]:
+        logger.info(f"Getting all authors with relations {relations}, skip {skip}, limit {limit}, for_update {for_update}")
+        query = select(AuthorModel).where(AuthorModel.is_deleted == False)
 
-        query = self.get_all_with_books_query(skip, limit)
+        if relations:
+            options = [selectinload(getattr(AuthorModel, rel)) for rel in relations]
+            query = query.options(*options)
+
+        query = query.offset(skip).limit(limit)
+
+        if for_update:
+            query = query.with_for_update(skip_locked=True)
+
         result = await self.db.execute(query)
         authors = list(result.scalars().all())
-        logger.info(f"Retrieved {len(authors)} authors | request_id={request_id}")
+        logger.info(f"Retrieved {len(authors)} authors")
         return authors
 
-    async def get_all_with_books_for_update(self, skip: int = 0, limit: int = 100, request_id: Optional [str] = None) -> List[AuthorModel]:
-        logger.info(f"Getting all author with books for update (skip={skip}, limit={limit}) | request_id={request_id}")
-        query = (
-            select(AuthorModel)
-            .where(AuthorModel.is_deleted == False)
-            .offset(skip)
-            .limit(limit)
-            .options(selectinload(AuthorModel.books))
-            .with_for_update(skip_locked=True)
-        )
-        result = await self.db.execute(query)
-        authors = list(result.scalars().all())
-        logger.info(f"Retrieved {len(authors)} authors with books (locked) | request_id={request_id}")
-        return authors
+    async def get_all_with_books(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[AuthorModel]:
+        return await self.get_all_with_relations(skip, limit, relations=["books"])
+
+    async def get_all_with_books_for_update(self, skip: int = 0, limit: int = 100) -> List[AuthorModel]:
+        return await self.get_all_with_relations(skip, limit, relations=["books"], for_update=True)

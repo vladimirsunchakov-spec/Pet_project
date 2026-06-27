@@ -1,11 +1,12 @@
 import sqlalchemy as sa
 from sqlalchemy.orm import DeclarativeMeta, declarative_base, Mapped, mapped_column
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 metadata = sa.MetaData()
 
-
 class BaseServiceModel:
+
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime,
         default=datetime.now(timezone.utc)
