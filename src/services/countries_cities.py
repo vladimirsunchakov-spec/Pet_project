@@ -35,16 +35,12 @@ class CountriesCitiesService(BaseService):
         self._log_info("Fetching country", entity_id=country_id, request_id=self.request_id)
 
         cache_key = f"country:{country_id}"
+        cached = await redis_client.get_cached(cache_key, CountryResponse)
+        if cached:
+            self._log_info("Cache HIT for country", entity_id=country_id, request_id=self.request_id)
+            return cached
 
-        try:
-            cached_data = await redis_client.get(cache_key)
-            if cached_data:
-                self._log_info("Cache HIT for country", entity_id=country_id, request_id=self.request_id)
-                return CountryResponse.model_validate_json(cached_data)
-
-            self._log_info("Cache MISS for country", entity_id=country_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on get: {e}", request_id=self.request_id)
+        self._log_info("Cache MISS for country", entity_id=country_id, request_id=self.request_id)
 
         country = await self.country_repo.get_with_cities(country_id)
         if not country:
@@ -53,18 +49,14 @@ class CountriesCitiesService(BaseService):
 
         response = CountryResponse.model_validate(country)
 
-        try:
-            await redis_client.set(cache_key, response.model_dump(), ttl=3600)
-            self._log_info("Country cached", entity_id=country_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on set: {e}", request_id=self.request_id)
+        await redis_client.set_cached(cache_key, response)
 
         return response
 
     async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
         self._log_info("Fetching countries", request_id=self.request_id, skip=skip, limit=limit)
 
-        countries = await self.country_repo.get_all_with_cities_for_update(skip=skip, limit=limit)
+        countries = await self.country_repo.get_all_with_relations(skip=skip, limit=limit, relations=["cities"], for_update=True)
 
         self._log_info("Countries fetched", count=len(countries), request_id=self.request_id)
 
@@ -90,12 +82,9 @@ class CountriesCitiesService(BaseService):
             self.db.add_all(new_cities)
             await self.db.refresh(country, attribute_names=["cities"])
 
-        try:
-            await redis_client.delete(f"country:{country_id}")
-            self._log_info("Cache invalidated for country", country_id=country_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", country_id=country_id, request_id=self.request_id)
-        self._log_info("Updated country", entity_id=country_id, request_id=self.request_id, cities_added=len(data.add_cities) if data.add_cities else 0)
+        await redis_client.invalidate(f"country:{country_id}")
+
+        self._log_info("Updated country", entity_id=country_id, request_id=self.request_id)
         return CountryResponse.model_validate(country)
 
     async def delete_country(self, country_id: UUID) -> None:
@@ -106,10 +95,7 @@ class CountriesCitiesService(BaseService):
             self._log_warning("Country not found for delete", entity_id=country_id, request_id=self.request_id)
             raise NotFoundError("Country", str(country_id))
 
-        try:
-            await redis_client.delete(f"country:{country_id}")
-            self._log_info("Cache invalidated for deleted country", country_id=country_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", request_id=self.request_id)
+        await redis_client.invalidate(f"country:{country_id}")
+
         self._log_info("Deleted country", entity_id=country_id, request_id=self.request_id)
 

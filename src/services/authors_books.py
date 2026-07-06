@@ -46,16 +46,13 @@ class AuthorsBooksService(BaseService):
         self._log_info("Fetching author", entity_id=author_id, request_id=self.request_id)
 
         cache_key = f"author:{author_id}"
+        cached = await redis_client.get_cached(cache_key, AuthorResponse)
+        if cached:
+            self._log_info("Cache HIT for author", author_id=author_id, request_id=self.request_id)
+            return cached
 
-        try:
-            cached_data = await redis_client.get(cache_key)
-            if cached_data:
-                self._log_info("Cache HIT for author", author_id=author_id, request_id=self.request_id)
-                return AuthorResponse.model_validate_json(cached_data)
+        self._log_info("Cache MISS for author", author_id=author_id, request_id=self.request_id)
 
-            self._log_info("Cache MISS for author", author_id=author_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on get: {e}", request_id=self.request_id)
         author = await self.author_repo.get_with_books(author_id)
         if not author:
             self._log_warning("Author not found", author_id=author_id, request_id=self.request_id)
@@ -74,20 +71,18 @@ class AuthorsBooksService(BaseService):
         except Exception as e:
             self._log_warning(f"Error fetching bio for author: {e}", author_id=author.id, request_id=self.request_id)
 
-        try:
-            await redis_client.set(cache_key, response.model_dump(), ttl=3600)
-            self._log_info("Author cached", author_id=author.id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on set: {e}", request_id=self.request_id)
+        await redis_client.set_cached(cache_key, response)
 
         return response
 
     async def get_authors(self, skip: int = 0, limit: int = 100) -> List[AuthorResponse]:
         self._log_info("Fetching authors", skip=skip, limit=limit, request_id=self.request_id)
 
-        authors = await self.author_repo.get_all_with_books_for_update(
+        authors = await self.author_repo.get_all_with_relations(
             skip=skip,
-            limit=limit
+            limit=limit,
+            relations=["books"],
+            for_update=True
         )
         self._log_info("Authors fetched", count=len(authors), request_id=self.request_id)
 
@@ -103,13 +98,9 @@ class AuthorsBooksService(BaseService):
 
         data.update_model(author)
 
-        try:
-            await redis_client.delete(f"author:{author_id}")
-            self._log_info("Cache invalidated for author", author_id=author_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", request_id=self.request_id)
-        self._log_info("Author updated", author_id=author_id, request_id=self.request_id)
+        await redis_client.invalidate(f"author:{author_id}")
 
+        self._log_info("Author updated", author_id=author_id, request_id=self.request_id)
         return AuthorResponse.model_validate(author)
 
     async def delete_author(self, author_id: UUID) -> None:
@@ -119,17 +110,7 @@ class AuthorsBooksService(BaseService):
             self._log_warning("Author not found for delete", entity_id=author_id, request_id=self.request_id)
             raise NotFoundError("Author", str(author_id))
 
-        try:
-            await self.bio_client.delete_bio(author_id)
-            self._log_info("Bio deleted for author", author_id=author_id, request_id=self.request_id)
+        await redis_client.invalidate(f"author: {author_id}")
 
-        except Exception as e:
-            self._log_warning(f"Error deleting bio for author: {e}", author_id=author_id, request_id=self.request_id)
-
-        try:
-            await redis_client.delete(f"author:{author_id}")
-            self._log_info("Cache invalidated for deleted author", author_id=author_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", request_id=self.request_id)
         self._log_info("Author deleted", entity_id=author_id, request_id=self.request_id)
 

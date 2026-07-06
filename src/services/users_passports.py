@@ -26,51 +26,36 @@ class UsersPassportsService(BaseService):
     async def create_user(self, data: UserCreate) -> UserResponse:
         self._log_info("Creating user", request_id=self.request_id, username=data.username, has_passport=bool(data.passport))
 
-        existing_user = await self.user_repo.get_by_username(data.username)
-        if existing_user:
-            self._log_error(f"User with username '{data.username}' already exists", request_id=self.request_id)
-            raise AlreadyExistsError("User", f"username '{data.username}' already exists")
-
-        user = data.to_model()
-        self.db.add(user)
-        await self.db.refresh(user)
+        user_data = data.model_dump()
+        user = await self.user_repo.upsert_user(user_data)
 
         self._log_info("Created user", entity_id=user.id, request_id=self.request_id)
-
         return UserResponse.model_validate(user)
 
     async def get_user(self, user_id: UUID) -> UserResponse:
         self._log_info("Fetching user", entity_id=user_id, request_id=self.request_id)
 
         cache_key = f"user:{user_id}"
+        cached = await redis_client.get_cached(cache_key, UserResponse)
+        if cached:
+            self._log_info("Cache HIT for user", entity_id=user_id, request_id=self.request_id)
+            return cached
+        self._log_info("Cache MISS for user", entity_id=user_id, request_id=self.request_id)
 
-        try:
-            cached_data = await redis_client.get(cache_key)
-            if cached_data:
-                self._log_info("Cache HIT for user", entity_id=user_id, request_id=self.request_id)
-                return UserResponse.model_validate_json(cached_data)
-
-            self._log_info("Cache MISS for user", entity_id=user_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on get: {e}", request_id=self.request_id)
         user = await self.user_repo.get_with_passport(user_id)
         if not user:
             self._log_warning("User not found", user_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
         response = UserResponse.model_validate(user)
 
-        try:
-            await redis_client.set(cache_key, response.model_dump(), ttl=3600)
-            self._log_info("User cached", user_id=user_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on set: {e}", request_id=self.request_id)
+        await redis_client.set_cached(cache_key, response)
 
         return response
 
     async def get_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
         self._log_info("Fetching users list", skip=skip, limit=limit, request_id=self.request_id)
 
-        users = await self.user_repo.get_all_with_passport_for_update(skip, limit)
+        users = await self.user_repo.get_all_with_relations(skip=skip, limit=limit, relations=["passport"], for_update=True)
 
         self._log_info("Users fetched", count=len(users), request_id=self.request_id)
         return UserResponse.from_model_list(users)
@@ -78,24 +63,18 @@ class UsersPassportsService(BaseService):
     async def update_user(self, user_id: UUID, data: UserUpdate) -> UserResponse:
         self._log_info("Updating user", entity_id=user_id, request_id=self.request_id)
 
-        user = await self.user_repo.get_with_passport(user_id)
+        user = await self.user_repo.get_with_passport_for_update(user_id)
         if not user:
             self._log_warning("User not found for update", entity_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
 
-        if data.username is not None and data.username != user.username:
-            existing_user = await self.user_repo.get_by_username(data.username)
-            if existing_user:
-                self._log_error(f"User with username '{data.username}' already exists", request_id=self.request_id)
-                raise AlreadyExistsError("User", f"username '{data.username}' already exists")
+        update_data = data.model_dump(exclude_unset=True)
+        if update_data:
+            update_data["id"] = user_id
+            user = await self.user_repo.upsert_user(update_data)
 
-        data.update_model(user)
+        await redis_client.invalidate(f"user:{user_id}")
 
-        try:
-            await redis_client.delete(f"user:{user_id}")
-            self._log_info("Cache invalidated for user", user_id=user_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", request_id=self.request_id)
         self._log_info("Updated user", entity_id=user.id, request_id=self.request_id)
         return UserResponse.model_validate(user)
 
@@ -107,10 +86,7 @@ class UsersPassportsService(BaseService):
             self._log_warning("User not found for delete", entity_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
 
-        try:
-            await redis_client.delete(f"user:{user_id}")
-            self._log_info("Cache invalidated for deleted user", user_id=user_id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Redis error on delete: {e}", request_id=self.request_id)
+        await redis_client.invalidate(f"user:{user_id}")
+
         self._log_info("Deleted user", entity_id=user_id, request_id=self.request_id)
 
