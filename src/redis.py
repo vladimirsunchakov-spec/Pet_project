@@ -1,9 +1,8 @@
 import json
 from typing import Any, Optional, Type
-import redis.asyncio as redis
 import logging
 import redis.asyncio as redis
-from healthcheck.router import healthcheck
+from redis.exceptions import RedisError
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -17,15 +16,15 @@ class RedisClient:
             self._client = await redis.from_url(
                 settings.redis_url,
                 decode_responses=True,
-                max_connections = 20,
+                max_connections=20,
                 retry_on_timeout=True,
                 socket_keepalive=True,
                 health_check_interval=30,
             )
             await self._client.ping()
-            logger.info("Redis client initialize successfully")
+            logger.info("Redis client initialized successfully")
             return True
-        except Exception as e:
+        except RedisError as e:
             logger.error(f"Failed to initialize Redis: {e}")
             self._client = None
             return False
@@ -42,14 +41,14 @@ class RedisClient:
 
     async def get(self, key: str) -> Optional[Any]:
         try:
-            client = await self._ensure_client()
-            data = await self.client.get(key)
+            await self._ensure_client()
+            data = await self._client.get(key)
             return json.loads(data) if data else None
-        except Exception as e:
+        except RedisError as e:
             logger.error(f"Redis GET error for '{key}': {e}")
             return None
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) ->bool:
+    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         try:
             client = await self._ensure_client()
             if ttl is None:
@@ -58,9 +57,9 @@ class RedisClient:
             if ttl <= 0:
                 await client.set(key, serialized)
             else:
-                await client.setex(key,ttl, serialized)
+                await client.setex(key, ttl, serialized)
             return True
-        except Exception as e:
+        except RedisError as e:
             logger.error(f"Redis SET error for '{key}': {e}")
             return False
 
@@ -68,24 +67,9 @@ class RedisClient:
         try:
             client = await self._ensure_client()
             return await client.delete(key)
-        except Exception as e:
+        except RedisError as e:
             logger.error(f"Redis DELETE error for '{key}': {e}")
             return 0
-
-    async def exists(self, key: str) -> bool:
-        try:
-            client = await self._ensure_client()
-            return await client.exists(key) > 0
-        except Exception as e:
-            logger.error(f"Redis EXISTS error for '{key}': {e}")
-            return False
-
-    async def ping(self) -> bool:
-        try:
-            client = await self._ensure_client()
-            return await client.ping()
-        except Exception:
-            return False
 
     async def get_cached(self, key: str, model_class: Type) -> Optional[Any]:
         try:
@@ -94,7 +78,7 @@ class RedisClient:
                 logger.debug(f"Cache HIT: {key}")
                 return model_class.model_validate_json(data)
             logger.debug(f"Cache MISS: {key}")
-        except Exception as e:
+        except RedisError as e:
             logger.warning(f"Redis get_cached error for '{key}': {e}")
         return None
 
@@ -106,7 +90,7 @@ class RedisClient:
             if result:
                 logger.debug(f"Cache SET: {key}")
             return result
-        except Exception as e:
+        except RedisError as e:
             logger.warning(f"Redis set_cached error for '{key}': {e}")
             return False
 
@@ -114,17 +98,7 @@ class RedisClient:
         try:
             await self.delete(key)
             logger.info(f"Cache invalidated: {key}")
-        except Exception as e:
+        except RedisError as e:
             logger.warning(f"Redis invalidate error for '{key}': {e}")
-
-    async def invalidate_pattern(self, pattern: str) -> None:
-        try:
-            client = await self._ensure_client()
-            keys = await client.keys(pattern)
-            if keys:
-                await client.delete(*keys)
-                logger.info(f"Cache invalidated {len(keys)} keys with pattern {pattern}")
-        except Exception as e:
-            logger.warning(f"Redis invalidate_pattern error for '{pattern}': {e}")
 
 redis_client = RedisClient()

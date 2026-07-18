@@ -11,7 +11,7 @@ from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.models.users import UserModel
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
-from src.core.redis import redis_client
+from src.redis import redis_client
 from src.repositories.user_repository import UserRepository
 import logging
 
@@ -55,7 +55,7 @@ class UsersPassportsService(BaseService):
     async def get_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
         self._log_info("Fetching users list", skip=skip, limit=limit, request_id=self.request_id)
 
-        users = await self.user_repo.get_all_with_relations(skip=skip, limit=limit, relations=["passport"], for_update=True)
+        users = await self.user_repo.get_all_with_relations(skip=skip, limit=limit, relations=["passport"])
 
         self._log_info("Users fetched", count=len(users), request_id=self.request_id)
         return UserResponse.from_model_list(users)
@@ -68,10 +68,12 @@ class UsersPassportsService(BaseService):
             self._log_warning("User not found for update", entity_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
 
-        update_data = data.model_dump(exclude_unset=True)
-        if update_data:
-            update_data["id"] = user_id
-            user = await self.user_repo.upsert_user(update_data)
+        data.update_model(user)
+
+        user_data = data.model_dump(exclude_unset=True)
+        if user_data:
+            user_data["id"] = user_id
+            await self.user_repo.upsert_user(user_data)
 
         await redis_client.invalidate(f"user:{user_id}")
 

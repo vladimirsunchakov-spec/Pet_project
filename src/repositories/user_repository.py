@@ -13,15 +13,9 @@ class UserRepository(BaseRepository[UserModel]):
 
     async def upsert_user(self, user_data: dict) -> UserModel:
         username = user_data.get("username")
-        if not username:
-            raise ValueError("username is required for upsert")
 
         existing = await self.get_by_username(username)
         if existing:
-            if "id" in user_data:
-                for key, value in user_data.items():
-                    setattr(existing, key, value)
-                return existing
             return existing
 
         user = UserModel(**user_data)
@@ -46,7 +40,6 @@ class UserRepository(BaseRepository[UserModel]):
     async def get_by_username(self, username: str) -> Optional[UserModel]:
         query = select(UserModel).where(UserModel.username == username, UserModel.is_deleted == False)
         result = await self.db.execute(query)
-
         return result.scalar_one_or_none()
 
     async def get_all_with_relations(
@@ -54,7 +47,6 @@ class UserRepository(BaseRepository[UserModel]):
         skip: int = 0,
         limit: int = 100,
         relations: Optional[List[str]] = None,
-        for_update: bool = True
     ) -> List[UserModel]:
         query = select(UserModel).where(UserModel.is_deleted == False)
 
@@ -63,10 +55,7 @@ class UserRepository(BaseRepository[UserModel]):
             query = query.options(*options)
 
         query = query.offset(skip).limit(limit)
-
-        if for_update:
-            query = query.with_for_update(skip_locked=True)
-
+        query = query.with_for_update(skip_locked=True)
         result = await self.db.execute(query)
         users = list(result.scalars().all())
         return users

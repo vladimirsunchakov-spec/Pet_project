@@ -7,6 +7,7 @@ from src.models.books import BookModel
 from src.models.authors import AuthorModel
 from src.repositories.base import BaseRepository
 
+
 class AuthorRepository(BaseRepository[AuthorModel]):
     def __init__(self, db: AsyncSession):
         super().__init__(db, AuthorModel)
@@ -33,7 +34,6 @@ class AuthorRepository(BaseRepository[AuthorModel]):
         skip: int = 0,
         limit: int = 100,
         relations: Optional[List[str]] = None,
-        for_update: bool = True
     ) -> List[AuthorModel]:
         query = select(AuthorModel).where(AuthorModel.is_deleted == False)
 
@@ -42,10 +42,7 @@ class AuthorRepository(BaseRepository[AuthorModel]):
             query = query.options(*options)
 
         query = query.offset(skip).limit(limit)
-
-        if for_update:
-            query = query.with_for_update(skip_locked=True)
-
+        query = query.with_for_update(skip_locked=True)
         result = await self.db.execute(query)
         authors = list(result.scalars().all())
         return authors

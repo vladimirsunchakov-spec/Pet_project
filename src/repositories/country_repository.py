@@ -34,7 +34,6 @@ class CountryRepository(BaseRepository[CountryModel]):
         skip: int = 0,
         limit: int = 100,
         relations: Optional[List[str]] = None,
-        for_update: bool = True
     ) -> List[CountryModel]:
         query = select(CountryModel).where(CountryModel.is_deleted == False)
 
@@ -43,10 +42,7 @@ class CountryRepository(BaseRepository[CountryModel]):
             query = query.options(*options)
 
         query = query.offset(skip).limit(limit)
-
-        if for_update:
-            query = query.with_for_update(skip_locked=True)
-
+        query = query.with_for_update(skip_locked=True)
         result = await self.db.execute(query)
         countries = list(result.scalars().all())
         return countries
@@ -59,5 +55,63 @@ class CountryRepository(BaseRepository[CountryModel]):
         )
         result = await self.db.execute(query)
         exists = result.scalar_one_or_none() is not None
+
+    async def add_cities_if_not_exist(
+            self,
+            country_id: UUID,
+            city_names: List[str],
+    ) -> List[CountryModel]:
+
+        query = select(CityModel).where(
+            CityModel.country_id == country_id,
+            CityModel.name.in_(city_names),
+            CityModel.is_deleted == False
+        )
+        result = await self.db.execute(query)
+        existing_names = {city.name for city in result.scalars().all()}
+        new_cities = []
+        for name in city_names:
+            if name  not in existing_names:
+                city = CityModel(name=name, country_id=country_id)
+                self.db.add(city)
+                new_cities.append(city)
+
+        return new_cities
+
+    async def update_country_with_cities(
+            self,
+            country_id: UUID,
+            update_data: dict,
+            new_cities_names: Optional[List[str]] = None
+    ) -> CountryModel:
+        query = select(CountryModel).where(
+            CountryModel.id == country_id,
+            CountryModel.is_deleted == False
+        ).with_for_update(skip_locked=True)
+        result = await self.db.execute(query)
+        country = result.scalar_one_or_none()
+
+        if not country:
+            return None
+
+        for key, value in update_data.items():
+            if value is not None:
+                setattr(country, key, value)
+
+        if new_cities_names:
+            query = select(CityModel).where(
+                CityModel.country_id == country_id,
+                CityModel.name.in_(new_cities_names),
+                CityModel.is_deleted == False
+            )
+            result = await self.db.execute(query)
+            existing_names = {city.name for city in result.scalars().all()}
+
+            for name in new_cities_names:
+                if name not in existing_names:
+                    city = CityModel(name=name, country_id=country_id)
+                    self.db.add(city)
+            return country
+
 
 

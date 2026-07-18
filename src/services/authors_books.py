@@ -1,14 +1,17 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+from exceptions import ValidationError
 from src.services.base import BaseService
 from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from typing import List
-from src.core.redis import redis_client
+from src.redis import redis_client
 from src.repositories.author_repository import AuthorRepository
 from src.clients.bio_client import BioServiceClient
 import logging
+from src.clients.bio_client import BioServiceError, BioServiceUnavailableError
+from src.worker import bio_worker
 
 logger = logging.getLogger(__name__)
 
@@ -20,26 +23,20 @@ class AuthorsBooksService(BaseService):
         self.bio_client = BioServiceClient()
 
     async def create_author(self, data: AuthorCreate) -> AuthorResponse:
-        self._log_info("Creating author", request_id=self.request_id, name=data.name, books_count=len(data.books))
-
         author = data.to_model()
         self.db.add(author)
         await self.db.refresh(author)
 
         try:
-            bio_result = await self.bio_client.create_bio(
-                author_id=author.id,
-                rating=0.0,
-                awards_count=0
-            )
-            if bio_result:
-                self._log_info("Bio created for author", author_id=author.id, request_id=self.request_id)
-            else:
-                self._log_warning("Failed to create bio for author", author_id=author.id, request_id=self.request_id)
-        except Exception as e:
-            self._log_error(f"Error creating bio for author: {e}", author_id=author.id, request_id=self.request_id)
-        self._log_info("Author created", entity_id=author.id, request_id=self.request_id)
+            await self.bio_client.create_bio(author_id=author.id)
+        except BioServiceUnavailableError as e:
+            self._log_error(f"Bio Service unavailable: {e}", author_id=author.id, request_id=self.request_id)
+            await bio_worker.sсhedule_bio_creation(author.id)
 
+        except BioServiceError as e:
+            self._log_error(f"Bio Service error: {e}", author_id=author.id, request_id=self.request_id)
+            raise
+        self._log_info("Author created", entity_id=author.id, request_id=self.request_id )
         return AuthorResponse.model_validate(author)
 
     async def get_author(self, author_id: UUID) -> AuthorResponse:
@@ -68,11 +65,15 @@ class AuthorsBooksService(BaseService):
                 response.awards_count = bio_data.get("awards_count")
             else:
                 self._log_info("No bio data for author", author_id=author.id, request_id=self.request_id)
-        except Exception as e:
-            self._log_warning(f"Error fetching bio for author: {e}", author_id=author.id, request_id=self.request_id)
+                raise NotFoundError("Bio", f"author_id={author.id}")
+        except BioServiceUnavailableError as e:
+            self._log_error(f"Bio Service unavailable : {e}", author_id=author.id, request_id=self.request_id)
+            raise ValidationError(f"Bio Service unavailable for author {author.id}")
+        except BioServiceError as e:
+            self._log_error(f"Bio Service error: {e}", author_id=author.id, request_id=self.request_id)
+            raise
 
         await redis_client.set_cached(cache_key, response)
-
         return response
 
     async def get_authors(self, skip: int = 0, limit: int = 100) -> List[AuthorResponse]:
@@ -82,7 +83,6 @@ class AuthorsBooksService(BaseService):
             skip=skip,
             limit=limit,
             relations=["books"],
-            for_update=True
         )
         self._log_info("Authors fetched", count=len(authors), request_id=self.request_id)
 
@@ -110,7 +110,7 @@ class AuthorsBooksService(BaseService):
             self._log_warning("Author not found for delete", entity_id=author_id, request_id=self.request_id)
             raise NotFoundError("Author", str(author_id))
 
-        await redis_client.invalidate(f"author: {author_id}")
+        await redis_client.invalidate(f"author:{author_id}")
 
         self._log_info("Author deleted", entity_id=author_id, request_id=self.request_id)
 

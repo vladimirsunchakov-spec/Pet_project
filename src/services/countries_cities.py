@@ -9,7 +9,7 @@ from src.middleware.request_id import get_request_id
 from src.exceptions import NotFoundError, AlreadyExistsError
 from src.models.countries import CountryModel
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
-from src.core.redis import redis_client
+from src.redis import redis_client
 from src.repositories.country_repository import CountryRepository
 import logging
 
@@ -65,26 +65,25 @@ class CountriesCitiesService(BaseService):
     async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
         self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
 
-        country = await self.country_repo.get_with_cities(country_id)
+        update_data = data.model_dump(exclude_unset=True, include={"name", "continent"})
+        new_city_names = [city.name for city in data.cities] if data.add_cities else None
+        country = await self.country_repo.update_country_with_cities(
+            country_id,
+            update_data,
+            new_city_names,
+        )
         if not country:
             self._log_warning("Country not found for update", entity_id=country_id, request_id=self.request_id)
             raise NotFoundError("Country", str(country_id))
 
-        data.update_model(country)
-
-        if data.add_cities:
-            for city_data in data.add_cities:
-                if await self.country_repo.city_exists_in_country(city_data.name, country_id):
-                    self._log_error(f"City '{city_data.name}' already exists in country", country_id=country_id, request_id=self.request_id)
-                    raise AlreadyExistsError("City", f"City '{city_data.name}' already exists in country '{country.name}'")
-
-            new_cities = [city_data.to_model(country) for city_data in data.add_cities]
-            self.db.add_all(new_cities)
-            await self.db.refresh(country, attribute_names=["cities"])
-
         await redis_client.invalidate(f"country:{country_id}")
 
-        self._log_info("Updated country", entity_id=country_id, request_id=self.request_id)
+        self._log_info(
+            "Updated country",
+            entity_id=country_id,
+            request_id=self.request_id,
+            cities_added=len(data.add_cities) if data.add_cities else 0
+        )
         return CountryResponse.model_validate(country)
 
     async def delete_country(self, country_id: UUID) -> None:

@@ -116,4 +116,9 @@ class BioServiceClient:
         )
         return await self._post(f"{self._base_url}/bio/", request_data.model_dump())
 
+class BioServiceError(Exception):
+    pass
+
+class BioServiceUnavailableError(BioServiceError):
+    pass
 
