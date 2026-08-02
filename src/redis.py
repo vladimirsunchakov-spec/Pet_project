@@ -2,7 +2,6 @@ import json
 from typing import Any, Optional, Type
 import logging
 import redis.asyncio as redis
-from redis.exceptions import RedisError
 from src.config import settings
 
 logger = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ class RedisClient:
             await self._client.ping()
             logger.info("Redis client initialized successfully")
             return True
-        except RedisError as e:
+        except Exception as e:
             logger.error(f"Failed to initialize Redis: {e}")
             self._client = None
             return False
@@ -41,64 +40,51 @@ class RedisClient:
 
     async def get(self, key: str) -> Optional[Any]:
         try:
-            await self._ensure_client()
+            client = await self._ensure_client()
             data = await self._client.get(key)
-            return json.loads(data) if data else None
-        except RedisError as e:
-            logger.error(f"Redis GET error for '{key}': {e}")
-            return None
-
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
-        try:
-            client = await self._ensure_client()
-            if ttl is None:
-                ttl = settings.cache_ttl_seconds
-            serialized = json.dumps(value)
-            if ttl <= 0:
-                await client.set(key, serialized)
-            else:
-                await client.setex(key, ttl, serialized)
-            return True
-        except RedisError as e:
-            logger.error(f"Redis SET error for '{key}': {e}")
-            return False
-
-    async def delete(self, key: str) -> int:
-        try:
-            client = await self._ensure_client()
-            return await client.delete(key)
-        except RedisError as e:
-            logger.error(f"Redis DELETE error for '{key}': {e}")
-            return 0
-
-    async def get_cached(self, key: str, model_class: Type) -> Optional[Any]:
-        try:
-            data = await self.get(key)
             if data:
                 logger.debug(f"Cache HIT: {key}")
                 return model_class.model_validate_json(data)
             logger.debug(f"Cache MISS: {key}")
-        except RedisError as e:
+        except Exception as e:
+            logger.warning(f"Redis get_cached error for '{key}': {e}")
+        return None
+
+    async def get_cached(self, key: str, model_class: Type) -> Optional[Any]:
+        try:
+            client = await self._ensure_client()
+            data = await client.get(key)
+            if data:
+                logger.debug(f"Cache HIT: {key}")
+                return model_class.model_validate_json(data)
+            logger.debug(f"Cache MISS: {key}")
+        except Exception as e:
             logger.warning(f"Redis get_cached error for '{key}': {e}")
         return None
 
     async def set_cached(self, key: str, data: Any, ttl: Optional[int] = None) -> bool:
         try:
+            client = await self._ensure_client()
             if ttl is None:
                 ttl = settings.cache_ttl_seconds
-            result = await self.set(key, data.model_dump(), ttl=ttl)
-            if result:
-                logger.debug(f"Cache SET: {key}")
-            return result
-        except RedisError as e:
+            serialized = json.dumps(data.model_dump)
+
+            if ttl <= 0:
+                await self._client.set(key, serialized)
+            else:
+                await self._client.setex(key, serialized)
+            logger.debug(f"Cache SET: {key}")
+            return True
+        except Exception as e:
             logger.warning(f"Redis set_cached error for '{key}': {e}")
             return False
 
     async def invalidate(self, key: str) -> None:
         try:
-            await self.delete(key)
+            client = await self._ensure_client()
+            await client.delete(key)
             logger.info(f"Cache invalidated: {key}")
-        except RedisError as e:
+        except Exception as e:
             logger.warning(f"Redis invalidate error for '{key}': {e}")
 
 redis_client = RedisClient()

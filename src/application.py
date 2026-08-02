@@ -10,6 +10,7 @@ from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
 from src.worker import bio_worker
 from contextlib import asynccontextmanager
+from src.services.saga import saga_orchestrator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,18 @@ async def lifespan(app: FastAPI):
         logger.info("Bio worker started")
     except Exception as e:
         logger.warning(f"Bio worker start failed: {e}")
-    yield
+
+    try:
+        await saga_orchestrator.start()
+        logger.info("Saga orchestrator started")
+    except Exception as e:
+        logger.warning(f"Saga orchestrator start failed: {e}")
+
+    try:
+        await saga_orchestrator.stop()
+        logger.info("Saga orchestrator stopped")
+    except Exception as e:
+        logger.warning(f"Saga orchestrator stop failed: {e}")
 
     try:
         await bio_worker.stop()

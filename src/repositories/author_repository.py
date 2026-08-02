@@ -12,6 +12,20 @@ class AuthorRepository(BaseRepository[AuthorModel]):
     def __init__(self, db: AsyncSession):
         super().__init__(db, AuthorModel)
 
+    async def create_author(self, author: AuthorModel) -> AuthorModel:
+        self.db.add(author)
+        await self.db.flush()
+        await self.db.refresh(author)
+        return author
+
+    async def update_author(self, author: AuthorModel) -> AuthorModel:
+        await self.db.flush()
+        await self.db.refresh(author)
+        return author
+
+    async def delete_author(self, author_id: UUID) -> bool:
+        return await self.soft_delete(author_id)
+
     async def get_with_relations(self, id: UUID, relations: Optional[List[str]] = None) -> Optional[AuthorModel]:
         query = select(AuthorModel).where(
             AuthorModel.id == id,
@@ -36,11 +50,9 @@ class AuthorRepository(BaseRepository[AuthorModel]):
         relations: Optional[List[str]] = None,
     ) -> List[AuthorModel]:
         query = select(AuthorModel).where(AuthorModel.is_deleted == False)
-
         if relations:
             options = [selectinload(getattr(AuthorModel, rel)) for rel in relations]
             query = query.options(*options)
-
         query = query.offset(skip).limit(limit)
         query = query.with_for_update(skip_locked=True)
         result = await self.db.execute(query)
