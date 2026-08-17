@@ -1,10 +1,8 @@
-from sys import exc_info
-
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 from src.services.base import BaseService
-from src.middleware.request_id import get_request_id
+from utils.request_id import get_request_id
 from src.exceptions import NotFoundError
 from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from typing import List
@@ -13,7 +11,6 @@ from src.repositories.author_repository import AuthorRepository
 from src.clients.bio_client import BioServiceClient
 import logging
 from src.clients.bio_client import BioServiceError
-from src.worker import bio_worker
 from src.services.saga import CreateAuthorSaga, DeleteAuthorSaga, saga_orchestrator
 
 logger = logging.getLogger(__name__)

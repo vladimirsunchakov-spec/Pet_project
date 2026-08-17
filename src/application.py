@@ -3,7 +3,7 @@ from fastapi.responses import UJSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from src.logger import setup_logging
 from src.redis import redis_client
-from src.middleware.request_id import RequestIdMiddleware
+from utils.request_id import RequestIdMiddleware
 from src.healthcheck.router import router as healthcheck_router
 from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router

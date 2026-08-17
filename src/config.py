@@ -1,7 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn
-
-from clients.bio_client import SUCCESS_STATUS_CODE
+from typing import Set
 
 SUCCESS_STATUS_CODE = (200, 201,204)
 RETRYABLE_HTTP_STATUS_MIN = 500
@@ -23,6 +22,28 @@ class Settings(BaseSettings):
     retry_wait_multiplier: int = 1
     retry_wait_min: int = 1
     retry_wait_max: int = 10
+
+    non_retryable_statuses: Set[int] = {
+        400,
+        401,
+        403,
+        404,
+        409,
+        422,
+    }
+
+    retryable_statuses: Set[int] = {
+        500,
+        502,
+        503,
+        504,
+    }
+
+    success_statuses: Set[int] = {
+        200,
+        201,
+        204,
+    }
 
     debug: bool = False
 

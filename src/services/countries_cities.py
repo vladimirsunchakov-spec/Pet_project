@@ -1,13 +1,9 @@
-from datetime import timezone, datetime
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
 from uuid import UUID
 from src.services.base import BaseService
-from src.middleware.request_id import get_request_id
-from src.exceptions import NotFoundError, AlreadyExistsError
-from src.models.countries import CountryModel
+from utils.request_id import get_request_id
+from src.exceptions import NotFoundError
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.redis import redis_client
 from src.repositories.country_repository import CountryRepository
