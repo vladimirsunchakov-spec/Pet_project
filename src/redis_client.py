@@ -38,42 +38,52 @@ class RedisClient:
             raise RuntimeError("Redis client not initialized. Call initialize() first.")
         return self._client
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def ping(self) -> bool:
         try:
             client = await self._ensure_client()
-            data = await self._client.get(key)
-            if data:
-                logger.debug(f"Cache HIT: {key}")
-                return model_class.model_validate_json(data)
-            logger.debug(f"Cache MISS: {key}")
+            await client.ping()
+            return True
         except Exception as e:
-            logger.warning(f"Redis get_cached error for '{key}': {e}")
-        return None
+            logger.error(f"Redis ping error: {e}")
+            return False
+
+    async def rpush(self, key: str, value: str) -> int:
+       try:
+           client = await self._ensure_client()
+           return await client.rpush(key, value)
+       except Exception as e:
+           logger.error(f"Redis RPUSH error for '{key}': {e}")
+           return 0
+
+    async def lpop(self, key: str) -> Optional[str]:
+        try:
+            client = await self._ensure_client()
+            return await client.lpop(key)
+        except Exception as e:
+            logger.error(f"Redis LPOP error for '{key}': {e}")
+            return None
 
     async def get_cached(self, key: str, model_class: Type) -> Optional[Any]:
         try:
             client = await self._ensure_client()
             data = await client.get(key)
             if data:
-                logger.debug(f"Cache HIT: {key}")
                 return model_class.model_validate_json(data)
-            logger.debug(f"Cache MISS: {key}")
+            return None
         except Exception as e:
             logger.warning(f"Redis get_cached error for '{key}': {e}")
-        return None
+            return None
 
     async def set_cached(self, key: str, data: Any, ttl: Optional[int] = None) -> bool:
         try:
             client = await self._ensure_client()
             if ttl is None:
                 ttl = settings.cache_ttl_seconds
-            serialized = json.dumps(data.model_dump)
-
+            serialized = json.dumps(data.model_dump())
             if ttl <= 0:
-                await self._client.set(key, serialized)
+                await client.set(key, serialized)
             else:
-                await self._client.setex(key, serialized)
-            logger.debug(f"Cache SET: {key}")
+                await client.setex(key, ttl, serialized)
             return True
         except Exception as e:
             logger.warning(f"Redis set_cached error for '{key}': {e}")

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional
+from datetime import datetime
 
 class BioCreateRequest(BaseModel):
     author_id: UUID
@@ -8,22 +9,18 @@ class BioCreateRequest(BaseModel):
     awards_count: int = Field(default=0, ge=0, description="Количество наград")
     biography: Optional[str] = Field(None, max_length=1000, description="Биография автора")
 
-class BioSuccessResponse(BaseModel):
-    success:bool = True
-
 class BioResponse(BaseModel):
     id: UUID
     author_id: UUID
     rating: float
     awards_count: int
     biography: Optional[str]
+    status: str = Field(default="active", description="Статус bio: active или deleted")
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
-class BioUpdateRequest(BaseModel):
-    rating: Optional[float] = Field(None, ge=0, le=10.0)
-    awards_count: Optional[int] = Field(None, ge=0)
-    biography: Optional[str] = Field(None, max_length=1000)
+class BioStatusUpdate(BaseModel):
+    status: str = Field(..., description="Статус: active или deleted")

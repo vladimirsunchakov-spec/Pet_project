@@ -5,7 +5,7 @@ from src.exceptions import NotFoundError
 from src.services.base import BaseService
 from utils.request_id import get_request_id
 from src.schemas.users import UserCreate, UserUpdate, UserResponse
-from src.redis import redis_client
+from src.redis_client import redis_client
 from src.repositories.user_repository import UserRepository
 import logging
 

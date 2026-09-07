@@ -5,7 +5,7 @@ from typing import Optional, List
 from src.schemas.passports import PassportCreate, PassportUpdate
 from src.models.users import UserModel
 from src.models.passports import PassportModel
-from src.exceptions import ValidationError
+
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)

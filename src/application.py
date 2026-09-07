@@ -2,15 +2,16 @@ from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from src.logger import setup_logging
-from src.redis import redis_client
-from utils.request_id import RequestIdMiddleware
+from src.redis_client import redis_client
+from src.utils.request_id import RequestIdMiddleware
 from src.healthcheck.router import router as healthcheck_router
 from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
-from src.worker import bio_worker
+from workers.bio_worker import bio_worker
 from contextlib import asynccontextmanager
 from src.services.saga import saga_orchestrator
+from src.clients.bio_client import BioServiceClient
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,22 @@ async def lifespan(app: FastAPI):
         logger.info("Saga orchestrator started")
     except Exception as e:
         logger.warning(f"Saga orchestrator start failed: {e}")
+
+    try:
+        bio_client = BioServiceClient()
+        app.state.bio_client = bio_client
+        logger.info("BioServiceClient initialized")
+    except Exception as e:
+        logger.warning(f"BioServiceClient initialization failed: {e}")
+
+    yield
+
+    try:
+        if hasattr(app.state, "bio_client"):
+            await app.state.bio_client.close()
+            logger.info("BioServiceClient closed")
+    except Exception as e:
+        logger.warning(f"BioServiceClient close failed: {e}")
 
     try:
         await saga_orchestrator.stop()

@@ -1,15 +1,16 @@
 from uuid import UUID
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from services.saga.base_saga import BaseSaga
+from schemas.saga import SagaState
+from .base_saga import BaseSaga
 from src.services.actions.delete_author_actions import DeleteAuthorActions
 import logging
 
 logger = logging.getLogger(__name__)
 
 class DeleteAuthorSaga(BaseSaga):
-    def __init__(self, db_session: AsyncSession, author_id: UUID, saga_id: Optional[str] = None):
-        super().__init__(saga_id)
+    def __init__(self, db_session: AsyncSession, author_id: UUID, saga_id: Optional[str] = None, restore_from_state: Optional[SagaState] = None):
+        super().__init__(saga_id, db_session, restore_from_state)
         self.db_session = db_session
         self.author_id = author_id
         self.actions = DeleteAuthorActions(db_session, author_id)
@@ -19,28 +20,12 @@ class DeleteAuthorSaga(BaseSaga):
     def _build_saga(self):
         self.add_step(
             name="delete_bio",
-            action=self._delete_bio,
-            compensation=self._restore_bio
+            action=self.actions.delete_bio,
+            compensation=self.actions.restore_bio
         )
         self.add_step(
             name="delete_author",
-            action=self._delete_author,
-            compensation=self._restore_author
+            action=self.actions.delete_author,
+            compensation=self.actions.restore_author
         )
-
-    async def _step_delete_bio(self) -> bool:
-        result = await self.actions.delete_bio()
-        return {"bio deleted": result}
-
-    async def _step_delete_author(self) -> dict:
-        result = await self.actions.delete_author()
-        return {"author deleted": result}
-
-    async def _compensate_restore_bio(self):
-        await self.actions.restore_bio()
-
-    async def _compensate_restore_author(self):
-        await self.actions.restore_author()
-
-
 

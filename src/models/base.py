@@ -1,27 +1,23 @@
 import sqlalchemy as sa
-from sqlalchemy.orm import DeclarativeMeta, declarative_base, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, declarative_base, Mapped, mapped_column, DeclarativeBase
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from typing import Optional
 
-metadata = sa.MetaData()
-
-class BaseServiceModel:
+class Base(DeclarativeBase):
 
     created_at: Mapped[datetime] = mapped_column(
-        sa.DateTime,
-        default=datetime.now(timezone.utc)
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        sa.DateTime,
+        sa.DateTime(timezone=True),
         default=datetime.now(timezone.utc),
-        onupdate=datetime.now(timezone.utc)
+        nullable=False,
     )
-    is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False)
-    deleted_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        sa.DateTime(timezone=True),
+        onupdate=datetime.now(timezone.utc),
+        nullable=True,
+    )
+    is_deleted: Mapped[bool] = mapped_column(sa.Boolean, default=False, nullable=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(sa.DateTime, nullable=True)
 
     @classmethod
     def on_conflict_constraint(cls) -> tuple | None:
         return None
-
-
-Base: DeclarativeMeta = declarative_base(metadata=metadata, cls=BaseServiceModel)

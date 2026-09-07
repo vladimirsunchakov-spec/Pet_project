@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import Optional
-from src.services.saga.base_saga import BaseSaga
+from .base_saga import BaseSaga
 from src.services.actions.create_author_actions import CreateAuthorActions
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
@@ -25,32 +25,28 @@ class CreateAuthorSaga(BaseSaga):
         self.add_step(
             name="create_author",
             action=self._step_create_author,
-            compensation=self._compensate_author
+            compensation=lambda: self.actions.compensate_author(UUID(self.state.context["author_id"]))
         )
 
         self.add_step(
             name="create_bio",
             action=self._step_create_bio,
-            compensation=self._compensate_bio
+            compensation=lambda: self.actions.compensate_bio(UUID(self.state.context["author_id"]))
         )
 
     async def _step_create_author(self) -> dict:
         result = await self.actions.create_author()
-        self.state.context["author_data"] = result["author_id"]
+        self.state.context["author_id"] = result["author_id"]
+        logger.info(f"Author created with id {result['author_id']}")
         return result
 
     async def _step_create_bio(self) -> dict:
         author_id = UUID(self.state.context["author_id"])
+        logger.info(f"Creating bio for author {author_id}")
         result = await self.actions.create_bio(author_id)
-        self.state.context["bio_data"] = result.get["bio_data"]
+
+        if result and result.get("bio_data"):
+            self.state.context["bio_data"] = result["bio_data"]
+
         return result
 
-    async def _compensate_author(self):
-        author_id = self.state.context.get("author_id")
-        if author_id:
-            await self.actions.compensate_author(UUID(author_id))
-
-    async def _compensate_bio(self):
-        author_id = self.state.context.get("author_id")
-        if author_id:
-            await self.actions.compensate_bio(UUID(author_id))

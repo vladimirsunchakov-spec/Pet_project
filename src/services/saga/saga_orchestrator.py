@@ -1,21 +1,24 @@
-from typing import Optional, Dict, List, Type
-from uuid import UUID, uuid4
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
-
-from services.saga.base_saga import SagaStatus, SagaState
-from src.services.saga.base_saga import BaseSaga
-from src.services.saga.create_author_saga import CreateAuthorSaga
+from sqlalchemy.ext.asyncio import AsyncSession
+from repositories.saga_state_repository import SagaStateRepository
 from src.services.saga.delete_author_saga import DeleteAuthorSaga
+from src.services.saga.create_author_saga import CreateAuthorSaga
+from src.services.saga.base_saga import BaseSaga
+from src.schemas.saga import SagaResult, SagaStatus, SagaInfo, SagaState
+from typing import Optional, Dict, List, Type
+from uuid import uuid4, UUID
+
 
 logger = logging.getLogger(__name__)
 
-class SagaOrchestrator():
-    _active_sagas : Dict[str, BaseSaga] = {}
-    _saga_state: Dict[str, dict] = {}
-
-    def __init__(self):
+class SagaOrchestrator:
+    def __init__(self, db_session: Optional[AsyncSession] = None):
+        self.db_session = db_session
+        self._state_repo = SagaStateRepository(db_session) if db_session else None
+        self._active_sagas: Dict[str, BaseSaga] = {}
+        self._saga_states: Dict[str, dict] = {}
         self._recovery_task: Optional[asyncio.Task] = None
         self._running = False
 
@@ -38,38 +41,44 @@ class SagaOrchestrator():
         self,
         saga_class: Type[BaseSaga],
         **kwargs
-    ) -> dict:
+    ) -> SagaResult:
         saga_id = str(uuid4())
-        saga = saga_class(saga_id=saga_id, **kwargs)
+        saga = saga_class(saga_id=saga_id, db_session=self.db_session, **kwargs)
 
         self._active_sagas[saga_id] = saga
-        self._save_state(saga)
+        await self._save_state(saga)
 
         try:
             logger.info(f"Starting saga {saga_id} of type {saga.__class__.__name__}")
             result = await saga.execute()
-            self._save_state(saga)
+            await self._save_state(saga)
             self._active_sagas.pop(saga_id, None)
             logger.info(f"Saga {saga_id} completed successfully")
             return result
 
         except Exception as e:
             logger.error(f"Saga {saga_id} failed: {e}")
-            self._save_state(saga)
+            await self._save_state(saga)
             self._active_sagas.pop(saga_id, None)
             raise
 
-    async def recover_saga(self, saga_id: str) -> Optional[dict]:
-        state = self._load_state(saga_id)
+    async def recover_saga(self, saga_id: str) -> Optional[SagaResult]:
+        state = await self._load_state(saga_id)
         if not state:
             logger.warning(f"Saga {saga_id} not found for recovery")
             return None
 
         if state["status"] in [SagaStatus.COMPLETED.value, SagaStatus.COMPENSATED.value]:
             logger.info(f"Saga {saga_id} already completed/compensated")
-            return state
+            return SagaResult(
+                saga_id=saga_id,
+                status=state["status"],
+                context=state.get("context", {}),
+                error=state.get("error"),
+                completed_at=datetime.now(timezone.utc),
+            )
 
-        saga = self._restore_saga_from_state(state)
+        saga = await self._restore_saga_from_state(state)
         if not saga:
             logger.error(f"Failed to restore saga {saga_id}")
             return None
@@ -78,7 +87,7 @@ class SagaOrchestrator():
 
         try:
             result = await saga.execute()
-            self._save_state(saga)
+            await self._save_state(saga)
             self._active_sagas.pop(saga_id, None)
             logger.info(f"Saga {saga_id} recovered successfully")
             return result
@@ -97,7 +106,7 @@ class SagaOrchestrator():
         try:
             logger.info(f"Cancelling saga {saga_id}")
             await saga._compensate(saga.state.current_step)
-            self._save_state(saga)
+            await self._save_state(saga)
             self._active_sagas.pop(saga_id, None)
             return True
 
@@ -105,31 +114,34 @@ class SagaOrchestrator():
             logger.error(f"Failed to cancel saga {saga_id}: {e}")
             return False
 
-    def get_saga_status(self, saga_id: str) -> Optional[dict]:
+    def get_saga_status(self, saga_id: str) -> Optional[SagaInfo]:
         if saga_id in self._active_sagas:
             saga = self._active_sagas[saga_id]
-            return {
-                "saga_id": saga_id,
-                "status": saga.state.status.value,
-                "current_step": saga.state.current_step,
-                "total_steps": len(saga._steps),
-                "created_at": saga.state.created_at.isoformat(),
-                "updated_at": saga.state.updated_at.isoformat(),
-                "context": saga.state.context,
-                "is_active": True
-            }
+            return SagaInfo(
+                saga_id=saga_id,
+                saga_type=saga.__class__.__name__,
+                status=saga.state.status.value,
+                current_step=saga.state.current_step,
+                total_steps=len(saga._steps),
+                created_at=saga.state.created_at.isoformat(),
+                updated_at=saga.state.updated_at.isoformat(),
+                is_active=True,
+                error=saga.state.error,
+            )
 
-        state = self._load_state(saga_id)
+        state = self._saga_states.get(saga_id)
         if state:
-            return {
-                "saga_id": saga_id,
-                "status": state["status"],
-                "current_step": state.get("current_step", 0),
-                "created_at": state.get("created_at"),
-                "updated_at": state.get("updated_at"),
-                "is_active": False
-            }
-
+            return SagaInfo(
+                saga_id=saga_id,
+                saga_type=state.get("saga_type", "Unknown"),
+                status=state.get("status", "Unknown"),
+                current_step=state.get("current_step", 0),
+                total_steps=len(state.get("steps", [])),
+                created_at=state.get("created_at", ""),
+                updated_at=state.get("updated_at", ""),
+                is_active=False,
+                error=state.get("error")
+            )
         return None
 
     def get_all_sagas(self) -> List[dict]:
@@ -144,12 +156,12 @@ class SagaOrchestrator():
                 "created_at": saga.state.created_at.isoformat()
             })
 
-        for saga_id, state in list(self._saga_state.items())[-100:]:
+        for saga_id, state in list(self._saga_states.items())[-100:]:
             if saga_id not in self._active_sagas:
                 sagas.append({
                     "saga_id": saga_id,
                     "type": state.get("saga_type", "Unknown"),
-                    "status": state.get("status", "unknow"),
+                    "status": state.get("status", "unknown"),
                     "is_active": False,
                     "created_at": state.get("created_at")
                 })
@@ -175,7 +187,7 @@ class SagaOrchestrator():
 
     async def _find_stale_sagas(self) -> List[str]:
         stale_sagas = []
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         for saga_id, state in self._saga_states.items():
             if state.get("status") in [
@@ -190,7 +202,7 @@ class SagaOrchestrator():
 
         return stale_sagas
 
-    def _save_state(self, saga: BaseSaga):
+    async def _save_state(self, saga: BaseSaga):
         state = {
             "saga_id": saga.saga_id,
             "saga_type": saga.__class__.__name__,
@@ -213,18 +225,68 @@ class SagaOrchestrator():
 
         self._saga_states[saga.saga_id] = state
 
-    def _load_state(self, saga_id: str) -> Optional[dict]:
-        return self._saga_states.get(saga_id)
+        if self._state_repo:
+            try:
+                await self._state_repo.save_state(saga.saga_id, state)
+            except Exception as e:
+                logger.error(f"Failed to save state to DB: {e}")
 
-    def _restore_saga_from_state(self, state: dict) -> Optional[BaseSaga]:
+    async def _load_state(self, saga_id: str) -> Optional[dict]:
+        state = self._saga_states.get(saga_id)
+        if state:
+            return state
+
+        if self._state_repo:
+            try:
+                state_model = await self._state_repo.get_by_saga_id(saga_id)
+                if state_model:
+                    state = {
+                        "saga_id": state_model.saga_id,
+                        "saga_type": state_model.saga_type,
+                        "status": state_model.status,
+                        "current_step": state_model.current_step,
+                        "context": state_model.context,
+                        "error": state_model.error,
+                        "created_at": state_model.created_at.isoformat(),
+                        "updated_at": state_model.updated_at.isoformat(),
+                        "steps": [],
+                    }
+                    self._saga_states[saga_id] = state
+                    return state
+            except Exception as e:
+                logger.error(f"Failed to load state from DB: {e}")
+        return None
+
+    async def _restore_saga_from_state(self, state: dict) -> Optional[BaseSaga]:
         try:
             saga_type = state.get("saga_type")
             context = state.get("context", {})
 
+            saga_state = SagaState(
+                saga_id=state["saga_id"],
+                saga_type=state["saga_type"],
+                status=SagaStatus(state["status"]),
+                current_step=state["current_step"],
+                context=state.get("context", {}),
+                error=state.get("error"),
+                created_at=datetime.fromisoformat(state["created_at"]),
+                updated_at=datetime.fromisoformat(state["updated_at"]),
+            )
+
             if saga_type == "CreateAuthorSaga":
-                return None
+                return CreateAuthorSaga(
+                    db_session=self.db_session,
+                    author_data=context.get("author_data", {}),
+                    saga_id=state["saga_id"],
+                    restore_from_state=saga_state
+                )
             elif saga_type == "DeleteAuthorSaga":
-                return None
+                return DeleteAuthorSaga(
+                    db_session=self.db_session,
+                    author_id=UUID(context.get("author_id")),
+                    saga_id=state["saga_id"],
+                    restore_from_state=saga_state
+                )
             else:
                 logger.warning(f"Unknown saga type {saga_type}")
                 return None

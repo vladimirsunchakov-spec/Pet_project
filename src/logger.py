@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from pydantic import BaseModel
 import ujson
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 
 class LogSchema(BaseModel):
@@ -46,7 +46,7 @@ def setup_logging():
     root_logger.handlers.clear()
 
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(JSONEFormatter())
+    handler.setFormatter(JSONFormatter())
     root_logger.addHandler(handler)
 
     return root_logger
