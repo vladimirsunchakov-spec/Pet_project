@@ -1,88 +1,134 @@
-from datetime import timezone, datetime
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
 from uuid import UUID
+from src.models.cities import CityModel
+from src.schemas.cities import CityResponse, CityCreate
 from src.services.base import BaseService
-from src.middleware.request_id import get_request_id
-from src.exceptions import NotFoundError, AlreadyExistsError
-from src.models.countries import CountryModel
+from utils.request_id import get_request_id
+from src.exceptions import NotFoundError
 from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
+from src.redis_client import redis_client
+from src.repositories.country_repository import CountryRepository
+import logging
 
+logger = logging.getLogger(__name__)
 
 class CountriesCitiesService(BaseService):
     def __init__(self, db: AsyncSession):
-        self.db:AsyncSession = db
+        self.db: AsyncSession = db
         self.request_id = get_request_id()
+        self.country_repo = CountryRepository(db)
 
     async def create_country(self, data: CountryCreate) -> CountryResponse:
-        self._log_info("Creating country", request_id=self.request_id, name=data.name)
-
         country = data.to_model()
-        self.db.add(country)
+        created = await self.country_repo.create_country(country)
 
-        await self.db.refresh(country)
-
-        self._log_info("Created country", entity_id=country.id, request_id=self.request_id, cities_count=len(data.cities))
-
-        return CountryResponse.model_validate(country)
+        if data.cities:
+            city_models = [
+                CityModel(name=city.name, country_id=created.id)
+                for city in data.cities
+            ]
+            await self.country_repo.create_cities(city_models)
+        logger.info(
+        "Created country",
+            extra={
+                "entity_id": str(created.id),
+                "name": created.name,
+                "cities_count": len(data.cities),
+                "request_id": self.request_id
+            }
+        )
+        return CountryResponse.model_validate(created)
 
     async def get_country(self, country_id: UUID) -> CountryResponse:
-        self._log_info("Fetching country", entity_id=country_id, request_id=self.request_id)
+        cache_key = f"country:{country_id}"
+        cached = await redis_client.get_cached(cache_key, CountryResponse)
+        if cached:
+            return cached
 
-        query = (select(CountryModel)
-                 .where(CountryModel.id == country_id, CountryModel.is_deleted == False)
-                 .options(selectinload(CountryModel.cities)))
-        result = await self.db.execute(query)
-        country = result.scalar_one_or_none()
-
+        country = await self.country_repo.get_with_cities(country_id)
         if not country:
-            self._log_warning("Country not found", entity_id=country_id, request_id=self.request_id)
+            logger.warning(
+                "Country not found",
+                extra={"country_id": str(country_id), "request_id": self.request_id}
+            )
             raise NotFoundError("Country", str(country_id))
 
-        return CountryResponse.model_validate(country)
+        response = CountryResponse.model_validate(country)
+
+        await redis_client.set_cached(cache_key, response)
+
+        logger.info("Country fetched", extra={"country_id": str(country_id), "request_id": self.request_id})
+
+        return response
 
     async def get_countries(self, skip: int = 0, limit: int = 100) -> List[CountryResponse]:
-        self._log_info("Fetching countries",request_id=self.request_id, skip=skip, limit=limit)
+        countries = await self.country_repo.get_all_with_relations(skip=skip, limit=limit, relations=["cities"])
 
-        query = (
-            select(CountryModel)
-            .where(CountryModel.is_deleted == False)
-            .offset(skip)
-            .limit(limit)
-            .options(selectinload(CountryModel.cities))
-            .with_for_update(skip_locked=True)
-        )
-        result = await self.db.execute(query)
-        countries = result.scalars().all()
+        logger.info("Countries fetched", extra={"count": len(countries), "request_id": self.request_id})
 
         return CountryResponse.from_model_list(countries)
 
     async def update_country(self, country_id: UUID, data: CountryUpdate) -> CountryResponse:
-        self._log_info("Updating country", entity_id=country_id, request_id=self.request_id)
+        country = await self.country_repo.get_with_cities(country_id)
+        if not country:
+            logger.warning(
+                "Country not found for update",
+                extra={"country_id": str(country_id), "request_id": self.request_id}
+            )
+            raise NotFoundError("Country", str(country_id))
 
-        country = await self.get_country(country_id)
-        data.update_model(country)
+        update_data = data.model_dump(exclude_unset=True, include={"name", "continent"})
+        for key, value in update_data.items():
+            if value is not None:
+                setattr(country, key, value)
 
-        if data.add_cities:
-            existing_names = {city.name for city in country.cities}
-            for city_data in data.add_cities:
-                if city_data.name in existing_names:
-                    self._log_error(f"City '{city_data.name}' already exists in country", entity_id=country_id, request_id=self.request_id)
-                    raise AlreadyExistsError("City", city_data.name)
+        updated = await self.country_repo.update(country_id, **update_data)
+        await redis_client.invalidate(f"country:{country_id}")
 
-            new_cities = [city_data.to_model(country) for city_data in data.add_cities]
-            self.db.add_all(new_cities)
+        logger.info(
+            "Updated country",
+            extra={"entity_id": str(country_id), "request_id": self.request_id}
+        )
 
-        await self.db.refresh(country)
+        return CountryResponse.model_validate(updated)
 
-        self._log_info("Updated country", entity_id=country_id, request_id=self.request_id, cities_count=len(data.cities))
-        return CountryResponse.model_validate(country)
+    async def add_city_to_country(self, country_id: UUID, cities: List[CityCreate]) -> List[CityResponse]:
+        country = await self.country_repo.get(country_id)
+        if not country:
+            raise NotFoundError("Country", str(country_id))
+
+        existing_names = await self.country_repo.get_existing_city_names(
+            country_id,
+            [city.name for city in cities]
+        )
+        new_cities = []
+        for city_data in cities:
+            if city_data.name not in existing_names:
+                city_model = CityModel(
+                    name=city_data.name,
+                    country_id=country.id,
+                )
+                new_cities.append(city_model)
+
+        if new_cities:
+            created_cities = await self.country_repo.create_cities(new_cities)
+        else:
+            created_cities = []
+
+        logger.info(
+            "Cities added to country",
+            extra={"entity_id": str(country_id), "cities_added": len(new_cities), "request_id": self.request_id}
+        )
+        return [CityResponse.model_validate(city) for city in created_cities]
 
     async def delete_country(self, country_id: UUID) -> None:
-        self._log_info("Deleting country", entity_id=country_id, request_id=self.request_id)
+        deleted = await self.country_repo.soft_delete(country_id)
+        if not deleted:
+            logger.warning("Country not found for delete", extra={"country_id": str(country_id), "request_id": self.request_id})
+            raise NotFoundError("Country", str(country_id))
 
-        stmt = (update(CountryModel).where(CountryModel.id == country_id).values(is_deleted=True, deleted_at=datetime.now(timezone.utc)))
-        await self.db.execute(stmt)
-        self._log_info("Deleted country", entity_id=country_id, request_id=self.request_id)
+        await redis_client.invalidate(f"country:{country_id}")
+
+        logger.info("Deleted country", extra={"entity_id": str(country_id), "request_id": self.request_id})
+
