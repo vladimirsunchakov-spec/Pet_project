@@ -1,17 +1,19 @@
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 from starlette.middleware.cors import CORSMiddleware
-from src.logger import setup_logging
 from src.redis_client import redis_client
 from src.utils.request_id import RequestIdMiddleware
 from src.healthcheck.router import router as healthcheck_router
 from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
-from workers.bio_worker import bio_worker
 from contextlib import asynccontextmanager
-from src.services.saga import saga_orchestrator
+from src.services import saga_orchestrator
 from src.clients.bio_client import BioServiceClient
+from src.logger import setup_logging
+from src.db import async_session_maker
+from src.repositories.task_repository import TaskRepository
+from src.workers.bio_worker import create_bio_worker
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,18 +26,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis connection failed: {e}")
 
-    try:
-        await bio_worker.start()
-        logger.info("Bio worker started")
-    except Exception as e:
-        logger.warning(f"Bio worker start failed: {e}")
-
-    try:
-        await saga_orchestrator.start()
-        logger.info("Saga orchestrator started")
-    except Exception as e:
-        logger.warning(f"Saga orchestrator start failed: {e}")
-
+    bio_client = None
     try:
         bio_client = BioServiceClient()
         app.state.bio_client = bio_client
@@ -43,7 +34,45 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"BioServiceClient initialization failed: {e}")
 
+    if bio_client:
+        try:
+            session = async_session_maker()
+            app.state.worker_session = session
+            task_repo = TaskRepository(session)
+            bio_worker = create_bio_worker(task_repo, bio_client)
+            app.state.bio_worker = bio_worker
+            await bio_worker.start()
+            logger.info("Bio worker started")
+        except Exception as e:
+            logger.warning(f"Bio worker start failed: {e}")
+
+    try:
+        await saga_orchestrator.start()
+        logger.info("Saga orchestrator started")
+    except Exception as e:
+        logger.warning(f"Saga orchestrator start failed: {e}")
+
     yield
+
+    try:
+        await saga_orchestrator.stop()
+        logger.info("Saga orchestrator stopped")
+    except Exception as e:
+        logger.warning(f"Saga orchestrator stop failed: {e}")
+
+    try:
+        if hasattr(app.state, "bio_worker"):
+            await app.state.bio_worker.stop()
+            logger.info("Bio worker stopped")
+    except Exception as e:
+        logger.warning(f"Bio worker stop failed: {e}")
+
+    try:
+        if hasattr(app.state, "worker_session"):
+            await app.state.worker_session.close()
+            logger.info("Worker session closed")
+    except Exception as e:
+        logger.warning(f"Worker session close failed: {e}")
 
     try:
         if hasattr(app.state, "bio_client"):
@@ -53,22 +82,10 @@ async def lifespan(app: FastAPI):
         logger.warning(f"BioServiceClient close failed: {e}")
 
     try:
-        await saga_orchestrator.stop()
-        logger.info("Saga orchestrator stopped")
-    except Exception as e:
-        logger.warning(f"Saga orchestrator stop failed: {e}")
-
-    try:
-        await bio_worker.stop()
-        logger.info("Bio worker stopped")
-    except Exception as e:
-        logger.warning(f"Bio worker stop failed: {e}")
-
-    try:
         await redis_client.close()
         logger.info("Redis connection closed")
     except Exception as e:
-        logger.warning(f"Redis connection closed: {e}")
+        logger.warning(f"Redis connection close failed: {e}")
 
 def register_routes(app: FastAPI) -> None:
     app.include_router(healthcheck_router)
@@ -87,7 +104,6 @@ def get_app() -> FastAPI:
     )
 
     app.add_middleware(RequestIdMiddleware)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],

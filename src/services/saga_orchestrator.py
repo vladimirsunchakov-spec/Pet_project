@@ -1,13 +1,16 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import asyncio
+from src.repositories.task_repository import TaskRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-from repositories.saga_state_repository import SagaStateRepository
-from src.services.saga.delete_author_saga import DeleteAuthorSaga
-from src.services.saga.create_author_saga import CreateAuthorSaga
-from src.services.saga.base_saga import BaseSaga
-from src.schemas.saga import SagaResult, SagaStatus, SagaInfo, SagaState
-from typing import Optional, Dict, List, Type
+from src.clients.bio_client import BioServiceClient
+from src.repositories.author_repository import AuthorRepository
+from src.repositories.saga_state_repository import SagaStateRepository
+from src.services.author.delete.delete_author_saga import DeleteAuthorSaga
+from src.services.author.create.create_author_saga import CreateAuthorSaga
+from src.services.author.shared.base_saga import BaseSaga
+from src.schemas.saga import SagaResult, SagaStatus, SagaInfo, SagaState, SagaStateUpdate
+from typing import Optional, Dict, List
 from uuid import uuid4, UUID
 
 
@@ -21,6 +24,9 @@ class SagaOrchestrator:
         self._saga_states: Dict[str, dict] = {}
         self._recovery_task: Optional[asyncio.Task] = None
         self._running = False
+        self._author_repo = AuthorRepository(db_session) if db_session else None
+        self._bio_client = BioServiceClient()
+        self._task_repo = TaskRepository(db_session) if db_session else None
 
     async def start(self):
         self._running = True
@@ -37,28 +43,36 @@ class SagaOrchestrator:
                 pass
         logger.info("SagaOrchestrator stopped")
 
-    async def start_saga(
-        self,
-        saga_class: Type[BaseSaga],
-        **kwargs
-    ) -> SagaResult:
+    async def start_saga(self, saga_class, **kwargs) -> SagaResult:
         saga_id = str(uuid4())
-        saga = saga_class(saga_id=saga_id, db_session=self.db_session, **kwargs)
-
+        saga = saga_class(
+            saga_id=saga_id,
+            db_session=self.db_session,
+            author_repo=self._author_repo,
+            bio_client=self._bio_client,
+            task_repo=self._task_repo,
+            **kwargs,
+        )
         self._active_sagas[saga_id] = saga
         await self._save_state(saga)
-
         try:
             logger.info(f"Starting saga {saga_id} of type {saga.__class__.__name__}")
             result = await saga.execute()
+
             await self._save_state(saga)
+
             self._active_sagas.pop(saga_id, None)
-            logger.info(f"Saga {saga_id} completed successfully")
+            logger.info(f"Saga {saga_id} completed with status {result.status}")
             return result
 
         except Exception as e:
             logger.error(f"Saga {saga_id} failed: {e}")
-            await self._save_state(saga)
+            try:
+                await self._save_state(saga)
+            except Exception as save_error:
+                logger.critical(
+                    f"Saga {saga_id}: Critical - failed to save "
+                    f"Failed state: {save_error}")
             self._active_sagas.pop(saga_id, None)
             raise
 
@@ -68,7 +82,7 @@ class SagaOrchestrator:
             logger.warning(f"Saga {saga_id} not found for recovery")
             return None
 
-        if state["status"] in [SagaStatus.COMPLETED.value, SagaStatus.COMPENSATED.value]:
+        if state["status"] in [SagaStatus.COMPLETED.value, SagaStatus.COMPLETED_WITH_DEFERRED.value, SagaStatus.COMPENSATED.value]:
             logger.info(f"Saga {saga_id} already completed/compensated")
             return SagaResult(
                 saga_id=saga_id,
@@ -87,13 +101,22 @@ class SagaOrchestrator:
 
         try:
             result = await saga.execute()
+
             await self._save_state(saga)
+
             self._active_sagas.pop(saga_id, None)
             logger.info(f"Saga {saga_id} recovered successfully")
             return result
 
         except Exception as e:
             logger.error(f"Saga {saga_id} recovery failed: {e}")
+            try:
+                await self._save_state(saga)
+            except Exception as save_error:
+                logger.critical(
+                    f"Saga {saga_id}: Critical - failed to save "
+                    f"Failed state during recovery: {save_error}"
+                )
             self._active_sagas.pop(saga_id, None)
             return None
 
@@ -114,7 +137,7 @@ class SagaOrchestrator:
             logger.error(f"Failed to cancel saga {saga_id}: {e}")
             return False
 
-    def get_saga_status(self, saga_id: str) -> Optional[SagaInfo]:
+    async def get_saga_status(self, saga_id: str) -> Optional[SagaInfo]:
         if saga_id in self._active_sagas:
             saga = self._active_sagas[saga_id]
             return SagaInfo(
@@ -142,6 +165,23 @@ class SagaOrchestrator:
                 is_active=False,
                 error=state.get("error")
             )
+        if self._state_repo:
+            try:
+                state_model = await self._state_repo.get_by_saga_id(saga_id)
+                if state_model:
+                    return SagaInfo(
+                        saga_id=state_model.saga_id,
+                        saga_type=state_model.saga_type,
+                        status=state_model.status,
+                        current_step=state_model.current_step,
+                        total_steps=0,
+                        created_at=state_model.created_at.isoformat(),
+                        updated_at=state_model.updated_at.isoformat(),
+                        is_active=False,
+                        error=state_model.error,
+                    )
+            except Exception as e:
+                logger.error(f"Failed to get saga from DB: {e}")
         return None
 
     def get_all_sagas(self) -> List[dict]:
@@ -180,27 +220,28 @@ class SagaOrchestrator:
                 await asyncio.sleep(60)
 
             except asyncio.CancelledError:
-                break
+                logger.info("Recovery loop cancelled")
+                raise
+
             except Exception as e:
                 logger.error(f"Recovery loop error: {e}")
                 await asyncio.sleep(60)
 
     async def _find_stale_sagas(self) -> List[str]:
-        stale_sagas = []
-        now = datetime.now(timezone.utc)
+        if not self._state_repo:
+            logger.warning("No state repository available for stale saga search")
+            return []
 
-        for saga_id, state in self._saga_states.items():
-            if state.get("status") in [
-                SagaStatus.IN_PROGRESS.value,
-                SagaStatus.PENDING.value,
-            ]:
-                updated_at = state.get("updated_at")
-                if updated_at:
-                    updated_at = datetime.fromisoformat(updated_at)
-                    if (now - updated_at) > timedelta(minutes=5):
-                        stale_sagas.append(saga_id)
-
-        return stale_sagas
+        try:
+            claimed_models = await self._state_repo.claim_stale_sagas(
+                stale_minutes=5,
+                recovering_minutes=30,
+                limit=10,
+            )
+            return [model.saga_id for model in claimed_models]
+        except Exception as e:
+            logger.error(f"Failed to claim stale sagas: {e}")
+            return []
 
     async def _save_state(self, saga: BaseSaga):
         state = {
@@ -225,11 +266,24 @@ class SagaOrchestrator:
 
         self._saga_states[saga.saga_id] = state
 
-        if self._state_repo:
-            try:
-                await self._state_repo.save_state(saga.saga_id, state)
-            except Exception as e:
-                logger.error(f"Failed to save state to DB: {e}")
+        if not self._state_repo:
+            return
+
+        try:
+            update_data = SagaStateUpdate(
+                status=saga.state.status,
+                current_step=saga.state.current_step,
+                context=saga.state.context,
+                error=saga.state.error,
+            )
+            await self._state_repo.upsert_state(
+                saga_id=saga.saga_id,
+                saga_type=saga.state.saga_type,
+                update_data=update_data,
+                )
+        except Exception as e:
+            logger.error(f"Failed to save state to DB: {e}")
+            raise
 
     async def _load_state(self, saga_id: str) -> Optional[dict]:
         state = self._saga_states.get(saga_id)
@@ -278,14 +332,19 @@ class SagaOrchestrator:
                     db_session=self.db_session,
                     author_data=context.get("author_data", {}),
                     saga_id=state["saga_id"],
-                    restore_from_state=saga_state
+                    restore_from_state=saga_state,
+                    author_repo=self._author_repo,
+                    bio_client=self._bio_client,
+                    task_repo=self._task_repo,
                 )
             elif saga_type == "DeleteAuthorSaga":
                 return DeleteAuthorSaga(
                     db_session=self.db_session,
                     author_id=UUID(context.get("author_id")),
                     saga_id=state["saga_id"],
-                    restore_from_state=saga_state
+                    restore_from_state=saga_state,
+                    author_repo=self._author_repo,
+                    bio_client=self._bio_client,
                 )
             else:
                 logger.warning(f"Unknown saga type {saga_type}")

@@ -19,14 +19,6 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_all(self, skip: int = 0, limit: int = 100, **filters: Any) -> List[ModelType]:
-        query = select(self.model).where(self.model.is_deleted == False)
-        for field, value in filters.items():
-            query = query.where(getattr(self.model, field) == value)
-        query = query.offset(skip).limit(limit)
-        result = await self.db.execute(query)
-        return list(result.scalars().all())
-
     async def update(self, id: UUID, **values: Any) -> Optional[ModelType]:
         stmt = (
             update(self.model)
@@ -54,15 +46,6 @@ class BaseRepository(Generic[ModelType]):
             await self.db.flush()
             await self.db.refresh(deleted)
         return deleted
-
-    async def delete(self, id: UUID) -> Optional[ModelType]:
-        stmt = (
-            delete(self.model)
-            .where(self.model.id == id, self.model.is_deleted == False)
-            .returning(self.model)
-        )
-        result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def get_with_relations(
         self,

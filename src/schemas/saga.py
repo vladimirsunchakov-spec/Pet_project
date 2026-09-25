@@ -8,10 +8,12 @@ class SagaStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
+    COMPLETED_WITH_DEFERRED = "completed_with_deferred"
     COMPENSATING = "compensating"
     FAILED = "failed"
     COMPENSATED = "compensated"
     COMPENSATION_FAILED = "compensation_failed"
+    RECOVERING = "recovering"
 
 class SagaStepStatus(Enum):
     PENDING = "pending"
@@ -19,6 +21,7 @@ class SagaStepStatus(Enum):
     SUCCESS = "success"
     FAILED = "failed"
     COMPENSATED = "compensated"
+    DEFERRED = "deferred"
 
 @dataclass
 class SagaStep:
@@ -43,6 +46,12 @@ class SagaState:
     updated_at: datetime = field(default_factory=datetime.now)
     retry_count: int = 0
     max_retries: int = 3
+
+class SagaStateUpdate(BaseModel):
+    status: SagaStatus
+    current_step: int = 0
+    context: Dict[str, Any] = {}
+    error: Optional[str] = None
 
 class SagaResult(BaseModel):
     saga_id: str

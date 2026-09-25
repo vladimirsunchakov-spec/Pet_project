@@ -1,23 +1,20 @@
 import asyncio
 from typing import Optional
-import json
-import httpx
-from src.redis_client import redis_client
-from src.clients.bio_client import BioServiceClient, BioServiceError
+from uuid import UUID
+from src.models.task import TaskModel
+from src.repositories.task_repository import TaskRepository
+from src.clients.bio_client import BioServiceClient
+from src.exceptions import (ExternalServiceError, ExternalServiceUnavailableError)
 import logging
 
 logger = logging.getLogger(__name__)
 
 class BioCreationWorker:
-    QUEUE_KEY = "bio_creation_queue"
-    FAILED_KEY = "bio_creation_queue_failed"
-
-    def __init__(self):
-        self._bio_client = BioServiceClient()
+    def __init__(self, task_repo: TaskRepository, bio_client: BioServiceClient) -> None:
+        self._task_repo = task_repo
+        self._bio_client = bio_client
         self._running = False
         self._task: Optional[asyncio.Task] = None
-        self._current_task: Optional[dict] = None
-        self._task_completed = asyncio.Event()
 
     async def start(self):
         self._running = True
@@ -26,85 +23,80 @@ class BioCreationWorker:
 
     async def stop(self):
         self._running = False
-        if self._current_task:
-            logger.info("Waiting for current task to complete")
-            try:
-                await asyncio.wait_for(self._task_completed.wait(), timeout=30.0)
-                logger.info("Current task is complete")
-            except asyncio.TimeoutError:
-                logger.warning("Current task did not complete in time, forcing stop")
-
         if self._task:
             self._task.cancel()
             try:
                 await self._task
             except asyncio.CancelledError:
                 pass
-
         logger.info("BioCreationWorker stopped")
-
-    async def schedule_bio_creation(self, author_id, rating: float = 0.0, awards_count: int = 0):
-        task = {
-            "author_id": str(author_id),
-            "rating": rating,
-            "awards_count": awards_count,
-        }
-        await redis_client.rpush(self.QUEUE_KEY, json.dumps(task))
-        logger.info(f"Scheduled bio creation for author {author_id}")
 
     async def _process_queue(self):
         while self._running:
             try:
-                task_data = await redis_client.lpop(self.QUEUE_KEY)
-                if task_data:
-                    task = json.loads(task_data)
-                    self._current_task = task
-                    self._task_completed.clear()
-
-                    await self._create_bio(task)
-
-                    self._current_task = None
-                    self._task_completed.set()
+                tasks = await self._task_repo.claim_pending_tasks(
+                    limit=10,
+                    retry_backoff_seconds=60,
+                    processing_timeout_seconds=300,
+                )
+                if tasks:
+                    for task in tasks:
+                        await self._process_task(task)
                 else:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(5)
             except asyncio.CancelledError:
-                break
+                logger.info("BioCreationWorker cancelled")
+                raise
+
             except Exception as e:
                 logger.error(f"Error processing queue: {e}")
                 await asyncio.sleep(5)
 
-    async def _create_bio(self, task: dict):
-        author_id = task["author_id"]
-        rating = task.get("rating", 0.0)
-        awards_count = task.get("awards_count", 0)
+    async def _process_task(self, task: TaskModel):
+        task_type = task.task_type
+        payload = task.payload
+
+        logger.info(f"Processing task: {task.id} of type: '{task_type}'")
 
         try:
-            await self._bio_client.create_bio(
-                author_id=author_id,
-                rating=rating,
-                awards_count=awards_count
-            )
-            logger.info(f"Bio created for author {author_id} (worker)")
+            if task_type == "create_bio":
+                await self._handle_create_bio(task, payload)
+            else:
+                logger.error(f"Unknown task type: {task_type}")
+                await self._task_repo.mark_failed(
+                    task.id, f"Unknown task type: {task_type}"
+                )
+        except ExternalServiceUnavailableError as e:
+            logger.warning(f"Task {task.id}: service unavailable, will retry: {e}")
+            await self._task_repo.mark_retry(task.id, str(e))
 
-        except BioServiceError as e:
-            logger.error(f"Bio creation failed for author {author_id}, after all retries: {e}")
-            await self._save_failed_task(task, str(e))
+        except ExternalServiceError as e:
+            logger.error(f"Task {task.id}: client error, marking as failed: {e}")
+            await self._task_repo.mark_failed(task.id, str(e))
 
         except Exception as e:
-            logger.error(f"Unexpected error creating bio for author {author_id}: {e}")
-            await  self._save_failed_task(task, str(e))
+            logger.error(f"Task {task.id}: unexpected error, will retry: {e}", exc_info=True)
+            await self._task_repo.mark_retry(task.id, str(e))
 
-    async def _save_failed_task(self, task: dict, error: str):
-        task["error"] = error
-        await redis_client.rpush(self.FAILED_KEY, json.dumps(task))
-        logger.warning(f"Failed task saved to {self.FAILED_KEY}")
+    async def _handle_create_bio(self, task: TaskModel, payload: dict):
+        author_id = UUID(payload["author_id"])
+        rating = payload.get("rating", 0.0)
+        awards_count = payload.get("awards_count", 0)
 
-    async def retry_failed_task(self, task_data: str):
-        try:
-            task = json.loads(task_data)
-            await redis_client.rpush(self.QUEUE_KEY, json.dumps(task))
-            logger.info(f"Retried failed task for author {task.get('author_id')} ")
-        except Exception as e:
-            logger.error(f"Failed to retry task: {e}")
+        await self._bio_client.create_bio(
+            author_id=author_id,
+            rating=rating,
+            awards_count=awards_count
+        )
+        await self._task_repo.mark_done(task.id)
+        logger.info(f"Bio created for author {author_id} (task {task.id})")
 
-bio_worker = BioCreationWorker()
+def create_bio_worker(
+    task_repo: TaskRepository,
+    bio_client: BioServiceClient,
+) -> BioCreationWorker:
+    return BioCreationWorker(
+        task_repo=task_repo,
+        bio_client=bio_client,
+    )
+

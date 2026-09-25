@@ -3,7 +3,6 @@ from pydantic import PostgresDsn
 from typing import Set
 from http import HTTPStatus
 
-SUCCESS_STATUS_CODE = (200, 201,204)
 RETRYABLE_HTTP_STATUS_MIN = 500
 
 class Settings(BaseSettings):
