@@ -5,9 +5,6 @@ from src.schemas.authors import AuthorCreate, AuthorUpdate, AuthorResponse
 from src.dependencies import get_authors_books_service
 from typing import List
 from src.exceptions import NotFoundError
-import logging
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/authors-books", tags=["Authors & Books"])
 

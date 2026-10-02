@@ -1,5 +1,5 @@
-from typing import Optional, Any, Dict, Callable, Awaitable, List
-from uuid import UUID, uuid4
+from typing import Optional, Any, Callable, Awaitable, List
+from uuid import uuid4
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +7,7 @@ from src.schemas.saga import SagaStatus, SagaStep, SagaState, SagaStepStatus, Sa
 from src.repositories.saga_state_repository import SagaStateRepository
 
 logger = logging.getLogger(__name__)
+
 
 class BaseSaga:
     def __init__(
@@ -22,12 +23,6 @@ class BaseSaga:
             self.state = restore_from_state
             self._steps: List[SagaStep] = []
             self._current_step_index = self.state.current_step
-
-            logger.info(
-                f"Saga {self.saga_id}: Restored from state,"
-                f"current step: {self.state.current_step},"
-                f"status: {self.state.status}"
-            )
         else:
             self.state = SagaState(
                 saga_id=self.saga_id,
@@ -41,7 +36,7 @@ class BaseSaga:
         self,
         name: str,
         action: Callable[[], Awaitable[Any]],
-        compensation: Optional[Callable[[], Awaitable[None]]] = None
+        compensation: Optional[Callable[[], Awaitable[None]]] = None,
     ) -> "BaseSaga":
         step = SagaStep(
             id=len(self._steps) + 1,
@@ -53,14 +48,17 @@ class BaseSaga:
         return self
 
     async def execute(self) -> SagaResult:
-        if self.state.status in [SagaStatus.COMPLETED, SagaStatus.COMPLETED_WITH_DEFERRED, SagaStatus.COMPENSATED]:
-            logger.info(f"Saga {self.saga_id}: Already {self.state.status}")
+        if self.state.status in [
+            SagaStatus.COMPLETED,
+            SagaStatus.COMPLETED_WITH_DEFERRED,
+            SagaStatus.COMPENSATED,
+        ]:
             return SagaResult(
                 saga_id=self.saga_id,
                 status=self.state.status.value,
                 context=self.state.context,
                 error=self.state.error,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=datetime.now(timezone.utc),
             )
         self.state.status = SagaStatus.IN_PROGRESS
         await self._save_state()
@@ -75,13 +73,8 @@ class BaseSaga:
                 step = self._steps[idx]
                 self._current_step_index = idx
                 self.state.current_step = idx
-                logger.info(f"Saga {self.saga_id}: Executing step {idx+1}/{len(self._steps)} - {step.name}")
 
                 if step.status in [SagaStepStatus.SUCCESS, SagaStepStatus.DEFERRED]:
-                    logger.info(
-                        f"Saga {self.saga_id}: Step {step.name} already "
-                        f"{step.status.value}, skipping"
-                    )
                     if step.status == SagaStepStatus.DEFERRED:
                         has_deferred = True
                     continue
@@ -96,20 +89,21 @@ class BaseSaga:
                         step.status = SagaStepStatus.DEFERRED
                         step.result = result
                         has_deferred = True
-                        logger.info(
-                            f"Saga {self.saga_id}: Step {step.name} DEFERRED"
+                        logger.warning(
+                            "Saga %s: step %s deferred",
+                            self.saga_id,
+                            step.name,
                         )
                     else:
                         step.status = SagaStepStatus.SUCCESS
                         step.result = result
-                        logger.info(f"Saga {self.saga_id}: Step {step.name} completed")
 
                     await self._save_state()
 
                 except Exception as e:
                     step.status = SagaStepStatus.FAILED
                     step.error = str(e)
-                    logger.error(f"Saga {self.saga_id}: Step {step.name} failed: {e}")
+                    logger.error("Saga %s: step %s failed: %s", self.saga_id, step.name, e)
                     await self._compensate(idx)
                     compensation_done = True
                     return SagaResult(
@@ -119,19 +113,18 @@ class BaseSaga:
                         error=self.state.error,
                         completed_at=datetime.now(timezone.utc),
                     )
+
             if has_deferred:
                 self.state.status = SagaStatus.COMPLETED_WITH_DEFERRED
-                logger.info(f"Saga {self.saga_id}: Completed with deferred steps")
             else:
                 self.state.status = SagaStatus.COMPLETED
-                logger.info(f"Saga {self.saga_id}: Completed successfully")
             await self._save_state()
 
             return SagaResult(
                 saga_id=self.saga_id,
                 status=self.state.status.value,
                 context=self.state.context,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -142,8 +135,9 @@ class BaseSaga:
                     await self._save_state()
                 except Exception as save_error:
                     logger.critical(
-                        f"Saga {self.saga_id}: Critical - failed to save "
-                        f"Failed state: {save_error}"
+                        "Saga %s: failed to persist FAILED state: %s",
+                        self.saga_id,
+                        save_error,
                     )
 
             return SagaResult(
@@ -151,44 +145,51 @@ class BaseSaga:
                 status=self.state.status.value,
                 context=self.state.context,
                 error=self.state.error,
-                completed_at=datetime.now(timezone.utc)
+                completed_at=datetime.now(timezone.utc),
             )
 
     async def _compensate(self, failed_step_index: int):
         self.state.status = SagaStatus.COMPENSATING
         await self._save_state()
-        logger.info(f"Saga {self.saga_id}: Starting compensation from step {failed_step_index}")
+        logger.warning(
+            "Saga %s: starting compensation from step %s",
+            self.saga_id,
+            failed_step_index,
+        )
 
         compensation_failed = False
 
-        for idx in range(failed_step_index -1, -1, -1):
+        for idx in range(failed_step_index - 1, -1, -1):
             step = self._steps[idx]
             if step.status in [SagaStepStatus.SUCCESS, SagaStepStatus.FAILED] and step.compensation:
                 try:
-                    logger.info(f"Saga {self.saga_id}: Compensating step {idx + 1} - {step.name}")
                     await step.compensation()
                     step.status = SagaStepStatus.COMPENSATED
                     await self._save_state()
                 except Exception as e:
-                    logger.error(f"Saga {self.saga_id}: Compensation failed for step {step.name}: {e}")
+                    logger.error(
+                        "Saga %s: compensation failed for step %s: %s",
+                        self.saga_id,
+                        step.name,
+                        e,
+                    )
                     self.state.error = f"Compensation failed for {step.name}: {e}"
                     compensation_failed = True
                     break
+
         if compensation_failed:
             self.state.status = SagaStatus.COMPENSATION_FAILED
             await self._save_state()
-            logger.error(f"Saga {self.saga_id}: Compensation partially failed")
             raise Exception(f"Compensation failed: {self.state.error}")
 
         self.state.status = SagaStatus.COMPENSATED
         await self._save_state()
-        logger.info(f"Saga {self.saga_id}: Compensation completed")
 
     async def _save_state(self):
         self.state.updated_at = datetime.now(timezone.utc)
 
         if not self._state_repo:
-            logger.warning(f"Saga {self.saga_id}: No state repo available")
+            logger.warning("Saga %s: no state repo available", self.saga_id)
             return
         try:
             update_data = SagaStateUpdate(
@@ -197,17 +198,14 @@ class BaseSaga:
                 context=self.state.context,
                 error=self.state.error,
             )
-
             await self._state_repo.upsert_state(
                 saga_id=self.saga_id,
                 saga_type=self.state.saga_type,
                 update_data=update_data,
             )
-            logger.debug(f"Saga {self.saga_id}: State saved - {self.state.status}")
         except Exception as e:
-            logger.error(f"Saga {self.saga_id}: Failed to save state: {e}")
+            logger.error("Saga %s: failed to save state: %s", self.saga_id, e)
             raise
 
-    def get_state(self) ->SagaState:
+    def get_state(self) -> SagaState:
         return self.state
-

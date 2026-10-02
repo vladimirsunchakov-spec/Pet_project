@@ -1,9 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import PostgresDsn
-from typing import Set
 from http import HTTPStatus
 
-RETRYABLE_HTTP_STATUS_MIN = 500
 
 class Settings(BaseSettings):
     app_name: str = "PythonProject"
@@ -17,22 +15,29 @@ class Settings(BaseSettings):
 
     bio_service_url: str = "http://localhost:8001"
     bio_client_timeout: float = 10.0
+    bio_max_keepalive_connections: int = 10
+    bio_max_connections: int = 20
 
     retry_max_attempts: int = 3
     retry_wait_multiplier: int = 1
     retry_wait_min: int = 1
     retry_wait_max: int = 10
 
-    retryable_statuses: Set[int] = {
+    retryable_statuses: set[int] = {
         HTTPStatus.INTERNAL_SERVER_ERROR,
         HTTPStatus.BAD_GATEWAY,
         HTTPStatus.SERVICE_UNAVAILABLE,
         HTTPStatus.GATEWAY_TIMEOUT,
     }
 
-
+    bio_worker_claim_limit: int = 10
+    bio_worker_poll_interval_seconds: float = 5.0
+    bio_worker_retry_backoff_seconds: int = 60
+    bio_worker_processing_timeout_seconds: int = 300
+    bio_worker_max_concurrency: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
 
 settings = Settings()
 

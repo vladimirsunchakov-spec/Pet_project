@@ -6,6 +6,7 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class RedisClient:
     def __init__(self):
         self._client: Optional[redis.Redis] = None
@@ -38,31 +39,6 @@ class RedisClient:
             raise RuntimeError("Redis client not initialized. Call initialize() first.")
         return self._client
 
-    async def ping(self) -> bool:
-        try:
-            client = await self._ensure_client()
-            await client.ping()
-            return True
-        except Exception as e:
-            logger.error(f"Redis ping error: {e}")
-            return False
-
-    async def rpush(self, key: str, value: str) -> int:
-       try:
-           client = await self._ensure_client()
-           return await client.rpush(key, value)
-       except Exception as e:
-           logger.error(f"Redis RPUSH error for '{key}': {e}")
-           return 0
-
-    async def lpop(self, key: str) -> Optional[str]:
-        try:
-            client = await self._ensure_client()
-            return await client.lpop(key)
-        except Exception as e:
-            logger.error(f"Redis LPOP error for '{key}': {e}")
-            return None
-
     async def get_cached(self, key: str, model_class: Type) -> Optional[Any]:
         try:
             client = await self._ensure_client()
@@ -93,8 +69,8 @@ class RedisClient:
         try:
             client = await self._ensure_client()
             await client.delete(key)
-            logger.info(f"Cache invalidated: {key}")
         except Exception as e:
             logger.warning(f"Redis invalidate error for '{key}': {e}")
+
 
 redis_client = RedisClient()

@@ -6,9 +6,6 @@ from src.schemas.countries import CountryCreate, CountryUpdate, CountryResponse
 from src.schemas.cities import CityResponse, CityCreate
 from src.dependencies import get_countries_cities_service
 from src.exceptions import NotFoundError
-import logging
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/countries", tags=["Countries & Cities"])
 

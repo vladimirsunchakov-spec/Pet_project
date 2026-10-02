@@ -8,15 +8,15 @@ from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
 from contextlib import asynccontextmanager
-from src.services import saga_orchestrator
+from src.services.saga import saga_orchestrator
 from src.clients.bio_client import BioServiceClient
 from src.logger import setup_logging
 from src.db import async_session_maker
-from src.repositories.task_repository import TaskRepository
 from src.workers.bio_worker import create_bio_worker
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,21 +36,22 @@ async def lifespan(app: FastAPI):
 
     if bio_client:
         try:
-            session = async_session_maker()
-            app.state.worker_session = session
-            task_repo = TaskRepository(session)
-            bio_worker = create_bio_worker(task_repo, bio_client)
+            bio_worker = create_bio_worker(async_session_maker, bio_client)
             app.state.bio_worker = bio_worker
             await bio_worker.start()
             logger.info("Bio worker started")
         except Exception as e:
             logger.warning(f"Bio worker start failed: {e}")
 
-    try:
-        await saga_orchestrator.start()
-        logger.info("Saga orchestrator started")
-    except Exception as e:
-        logger.warning(f"Saga orchestrator start failed: {e}")
+        try:
+            saga_orchestrator.configure(
+                session_factory=async_session_maker,
+                bio_client=bio_client,
+            )
+            await saga_orchestrator.start()
+            logger.info("Saga orchestrator started")
+        except Exception as e:
+            logger.warning(f"Saga orchestrator start failed: {e}")
 
     yield
 
@@ -68,13 +69,6 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Bio worker stop failed: {e}")
 
     try:
-        if hasattr(app.state, "worker_session"):
-            await app.state.worker_session.close()
-            logger.info("Worker session closed")
-    except Exception as e:
-        logger.warning(f"Worker session close failed: {e}")
-
-    try:
         if hasattr(app.state, "bio_client"):
             await app.state.bio_client.close()
             logger.info("BioServiceClient closed")
@@ -87,11 +81,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis connection close failed: {e}")
 
+
 def register_routes(app: FastAPI) -> None:
     app.include_router(healthcheck_router)
     app.include_router(authors_books_router)
     app.include_router(countries_cities_router)
     app.include_router(users_passports_router)
+
 
 def get_app() -> FastAPI:
     setup_logging()

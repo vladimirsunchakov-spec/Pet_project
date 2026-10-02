@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from src.models.base import Base
 import uuid
 
+
 class TaskModel(Base):
     __tablename__ = "tasks"
 
@@ -38,6 +39,10 @@ class TaskModel(Base):
         default=5,
         nullable=False,
     )
+    attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
     error: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
@@ -50,5 +55,3 @@ class TaskModel(Base):
             "updated_at",
         ),
     )
-
-

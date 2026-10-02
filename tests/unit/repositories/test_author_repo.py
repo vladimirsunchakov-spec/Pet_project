@@ -55,7 +55,7 @@ async def test_update_author(db_session):
     repo = AuthorRepository(db_session)
 
     author = await repo.create(name="Old Author")
-    updated = await repo.update(author.id, name="New Name")
+    updated = await repo.update(author.id, {"name": "New Name"})
 
     assert updated.name is not None
     assert updated.name == "New Name"

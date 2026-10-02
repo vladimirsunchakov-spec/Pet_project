@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from schemas.saga import SagaStatus
+from src.schemas.saga import SagaStatus
 from src.services.base import BaseService
 from utils.request_id import get_request_id
 from src.exceptions import NotFoundError
@@ -11,33 +11,43 @@ from typing import List
 from src.redis_client import redis_client
 from src.repositories.author_repository import AuthorRepository
 from src.clients.bio_client import BioServiceClient
-from exceptions import (NotFoundError, ExternalServiceError, ExternalServiceUnavailableError)
+from src.exceptions import ExternalServiceError, ExternalServiceUnavailableError
 import logging
 from src.schemas.saga import SagaResult
 from src.services.saga import CreateAuthorSaga, DeleteAuthorSaga, saga_orchestrator
 
 logger = logging.getLogger(__name__)
 
+
 class AuthorsBooksService(BaseService):
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, bio_client: BioServiceClient | None = None):
         self.db: AsyncSession = db
         self.request_id = get_request_id()
         self.author_repo = AuthorRepository(db)
-        self.bio_client = BioServiceClient()
+        self.bio_client = bio_client or BioServiceClient()
 
     async def create_author(self, data: AuthorCreate) -> AuthorResponse:
         result: SagaResult = await saga_orchestrator.start_saga(
             saga_class=CreateAuthorSaga,
             db_session=self.db,
-            author_data=data.model_dump()
+            author_data=data,
         )
-        if result.status == SagaStatus.COMPLETED.value:
+        if result.status in (
+            SagaStatus.COMPLETED.value,
+            SagaStatus.COMPLETED_WITH_DEFERRED.value,
+        ):
             author_id = UUID(result.context["author_id"])
             author = await self.author_repo.get(author_id)
-
-            logger.info("Author created via saga", extra={"entity_id":str(author.id), "request_id": self.request_id})
+            logger.info(
+                "Author created",
+                extra={"entity_id": str(author.id), "request_id": self.request_id},
+            )
             return AuthorResponse.model_validate(author)
-        logger.error(f"Saga failed: {result.error}", extra={"saga_id": result.saga_id, "request_id": self.request_id})
+        logger.error(
+            "Author create saga failed: %s",
+            result.error,
+            extra={"saga_id": result.saga_id, "request_id": self.request_id},
+        )
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Saga failed: {result.error}")
 
     async def get_author(self, author_id: UUID) -> AuthorResponse:
@@ -48,7 +58,6 @@ class AuthorsBooksService(BaseService):
 
         author = await self.author_repo.get_with_books(author_id)
         if not author:
-            logger.warning("Author not found", extra={"author_id": str(author_id), "request_id": self.request_id})
             raise NotFoundError("Author", str(author_id))
 
         response = AuthorResponse.model_validate(author)
@@ -57,12 +66,18 @@ class AuthorsBooksService(BaseService):
             bio_data = await self.bio_client.get_bio_by_author_id(author.id)
             response.rating = bio_data.rating
             response.awards_count = bio_data.awards_count
-
         except ExternalServiceUnavailableError as e:
-            logger.warning(f"Bio Service unavailable, returning author without bio: {e}", extra={"author_id": str(author.id), "request_id": self.request_id})
+            logger.warning(
+                "Bio service unavailable, returning author without bio: %s",
+                e,
+                extra={"author_id": str(author.id), "request_id": self.request_id},
+            )
         except ExternalServiceError as e:
-            logger.warning(f"Bio Service error, returning author without bio: {e}", extra={"author_id": str(author.id), "request_id": self.request_id})
-
+            logger.warning(
+                "Bio service error, returning author without bio: %s",
+                e,
+                extra={"author_id": str(author.id), "request_id": self.request_id},
+            )
         except NotFoundError:
             pass
 
@@ -72,7 +87,6 @@ class AuthorsBooksService(BaseService):
     async def get_author_with_bio_required(self, author_id: UUID) -> AuthorResponse:
         author = await self.author_repo.get_with_books(author_id)
         if not author:
-            logger.warning("Author not found", extra={"author_id": str(author_id), "request_id": self.request_id})
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Author {author_id} not found")
 
         response = AuthorResponse.model_validate(author)
@@ -80,17 +94,24 @@ class AuthorsBooksService(BaseService):
             bio_data = await self.bio_client.get_bio_by_author_id(author.id)
             response.rating = bio_data.rating
             response.awards_count = bio_data.awards_count
-
         except NotFoundError as e:
-            logger.warning(f"Bio not found: {e}", extra={"author_id": str(author.id), "request_id": self.request_id})
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(e))
-
         except ExternalServiceUnavailableError as e:
-            logger.error(f"Bio Service unavailable: {e}", extra={"author_id": str(author.id), "request_id": self.request_id})
-            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Bio Service is temporarily unavailable. Please try again later")
-
+            logger.error(
+                "Bio service unavailable: %s",
+                e,
+                extra={"author_id": str(author.id), "request_id": self.request_id},
+            )
+            raise HTTPException(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Bio Service is temporarily unavailable. Please try again later",
+            )
         except ExternalServiceError as e:
-            logger.error(f"Bio Service error: {e}", extra={"author_id": str(author.id), "request_id": self.request_id})
+            logger.error(
+                "Bio service error: %s",
+                e,
+                extra={"author_id": str(author.id), "request_id": self.request_id},
+            )
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Bio Service error: {str(e)}")
         return response
 
@@ -100,22 +121,15 @@ class AuthorsBooksService(BaseService):
             limit=limit,
             relations=["books"],
         )
-
-        logger.info("Authors fetched", extra={"count": len(authors), "request_id": self.request_id})
-
         return AuthorResponse.from_model_list(authors)
 
     async def update_author(self, author_id: UUID, data: AuthorUpdate) -> AuthorResponse:
-
         author = await self.author_repo.get_with_books(author_id)
         if not author:
-            logger.warning("Author not found for update", extra={"author_id": str(author_id), "request_id": self.request_id})
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"Author {author_id} not found")
 
         data.update_model(author)
         await redis_client.invalidate(f"author:{author_id}")
-
-        logger.info("Author updated", extra={"author_id": str(author_id), "request_id": self.request_id})
         return AuthorResponse.model_validate(author)
 
     async def delete_author(self, author_id: UUID) -> None:
@@ -126,8 +140,14 @@ class AuthorsBooksService(BaseService):
         )
         if result.status == SagaStatus.COMPLETED.value:
             await redis_client.invalidate(f"author:{author_id}")
-            logger.info("Author deleted via saga", extra={"entity_id": str(author_id), "request_id": self.request_id})
+            logger.info(
+                "Author deleted",
+                extra={"entity_id": str(author_id), "request_id": self.request_id},
+            )
             return
-        logger.error(f"Saga failed: {result.error}", extra={"saga_id": result.saga_id, "request_id": self.request_id})
+        logger.error(
+            "Author delete saga failed: %s",
+            result.error,
+            extra={"saga_id": result.saga_id, "request_id": self.request_id},
+        )
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Saga failed: {result.error}")
-
