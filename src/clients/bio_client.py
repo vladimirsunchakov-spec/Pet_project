@@ -11,7 +11,7 @@ from src.exceptions import (
     ExternalServiceUnavailableError,
     ExternalServiceError,
 )
-from src.schemas.bio import BioCreateRequest, BioResponse, BioStatusUpdate
+from src.schemas.bio import BioCreateRequest, BioResponse
 from src.schemas.exceptions import ErrorDetails
 from src.utils.bio_http import BioStatusHandler, is_retryable_exception
 
@@ -89,16 +89,6 @@ class BioServiceClient:
         response = await self._execute_request("POST", url, json=data, headers=headers)
         return self._handle_response(response, url)
 
-    @retry(**_RETRY)
-    async def _patch(self, url: str, data: dict, headers: dict | None = None) -> BioResponse:
-        response = await self._execute_request(
-            "PATCH",
-            url,
-            json=data,
-            headers=headers or {},
-        )
-        return self._handle_response(response, url)
-
     async def get_bio_by_author_id(self, author_id: UUID) -> BioResponse:
         url = self._url(settings.bio_get_path, author_id=author_id)
         return await self._get(url)
@@ -115,16 +105,3 @@ class BioServiceClient:
             request.model_dump(mode="json"),
             headers=headers,
         )
-
-    async def update_bio_status(
-        self,
-        author_id: UUID,
-        status: str,
-        idempotency_key: str | None = None,
-    ) -> BioResponse:
-        url = self._url(settings.bio_status_path, author_id=author_id)
-        payload = BioStatusUpdate(status=status)
-        headers: dict[str, str] = {}
-        if idempotency_key:
-            headers["Idempotency-Key"] = idempotency_key
-        return await self._patch(url, payload.model_dump(mode="json"), headers=headers)

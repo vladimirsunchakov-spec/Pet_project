@@ -43,7 +43,6 @@ class CreateAuthorSaga(BaseSaga):
         self.add_step(
             name="create_bio",
             action=self._step_create_bio,
-            compensation=self._compensate_bio,
         )
 
     async def _step_create_author(self) -> SagaStepOutcome:
@@ -99,20 +98,3 @@ class CreateAuthorSaga(BaseSaga):
     async def _compensate_author(self) -> None:
         author_id = UUID(self.state.context["author_id"])
         await self._author_repo.soft_delete(author_id)
-
-    async def _compensate_bio(self) -> None:
-        author_id = UUID(self.state.context["author_id"])
-        try:
-            await self._bio_client.update_bio_status(
-                author_id=author_id,
-                status=settings.bio_deleted_status,
-                idempotency_key=f"{self.state.context['idempotency_key']}:compensate",
-            )
-        except ExternalServiceUnavailableError:
-            raise
-        except ExternalServiceError as e:
-            logger.warning(
-                "Bio compensation failed for author %s: %s",
-                author_id,
-                e,
-            )

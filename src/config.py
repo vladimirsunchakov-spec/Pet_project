@@ -19,11 +19,8 @@ class Settings(BaseSettings):
     bio_max_connections: int = 20
     bio_get_path: str = "/bio/{author_id}"
     bio_create_path: str = "/bio/"
-    bio_status_path: str = "/bio/{author_id}/status"
     bio_default_rating: float = 0.0
     bio_default_awards_count: int = 0
-    bio_deleted_status: str = "deleted"
-    bio_active_status: str = "active"
 
     retry_max_attempts: int = 3
     retry_wait_multiplier: int = 1
