@@ -83,14 +83,11 @@ class SagaStateRepository(BaseRepository[SagaStateModel]):
             return []
 
         saga_ids = [m.saga_id for m in models]
-        await self.db.execute(
+        update_result = await self.db.execute(
             update(SagaStateModel)
             .where(SagaStateModel.saga_id.in_(saga_ids))
             .values(status=SagaStatus.RECOVERING.value)
+            .returning(SagaStateModel)
         )
         await self.db.flush()
-
-        for model in models:
-            model.status = SagaStatus.RECOVERING.value
-
-        return models
+        return list(update_result.scalars().all())

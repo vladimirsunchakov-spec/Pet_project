@@ -74,6 +74,10 @@ class CountriesCitiesService(BaseService):
         return CountryResponse.model_validate(updated)
 
     async def add_city_to_country(self, country_id: UUID, cities: List[CityCreate]) -> List[CityResponse]:
+        country = await self.country_repo.get(country_id)
+        if not country:
+            raise NotFoundError("Country", str(country_id))
+
         async with self.db.begin_nested():
             created_cities = await self.country_repo.add_cities_to_country(country_id, cities)
 

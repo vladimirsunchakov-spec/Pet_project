@@ -27,7 +27,6 @@ class TaskModel(Base):
         String(20),
         nullable=False,
         default="pending",
-        index=True,
     )
     attempts: Mapped[int] = mapped_column(
         Integer,

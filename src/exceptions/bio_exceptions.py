@@ -10,6 +10,3 @@ class ExternalServiceError(Exception):
 
 class ExternalServiceUnavailableError(ExternalServiceError):
     pass
-
-class BioResponseParseError(ExternalServiceError):
-    pass

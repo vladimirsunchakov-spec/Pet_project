@@ -4,16 +4,18 @@ from typing import Optional, Any, Dict, Callable, Awaitable
 from datetime import datetime
 from pydantic import BaseModel
 
+
 class SagaStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
-    COMPLETED_WITH_DEFERRED = "completed_with_deferred"
+    WAITING_DEFERRED = "waiting_deferred"
     COMPENSATING = "compensating"
     FAILED = "failed"
     COMPENSATED = "compensated"
     COMPENSATION_FAILED = "compensation_failed"
     RECOVERING = "recovering"
+
 
 class SagaStepStatus(Enum):
     PENDING = "pending"
@@ -22,6 +24,17 @@ class SagaStepStatus(Enum):
     FAILED = "failed"
     COMPENSATED = "compensated"
     DEFERRED = "deferred"
+
+
+class SagaStepOutcomeStatus(str, Enum):
+    SUCCESS = "success"
+    DEFERRED = "deferred"
+
+
+class SagaStepOutcome(BaseModel):
+    status: SagaStepOutcomeStatus
+    data: Dict[str, Any] = {}
+
 
 @dataclass
 class SagaStep:
@@ -32,6 +45,7 @@ class SagaStep:
     status: SagaStepStatus = SagaStepStatus.PENDING
     result: Optional[Any] = None
     error: Optional[str] = None
+
 
 @dataclass
 class SagaState:
@@ -47,11 +61,13 @@ class SagaState:
     retry_count: int = 0
     max_retries: int = 3
 
+
 class SagaStateUpdate(BaseModel):
     status: SagaStatus
     current_step: int = 0
     context: Dict[str, Any] = {}
     error: Optional[str] = None
+
 
 class SagaResult(BaseModel):
     saga_id: str
@@ -67,9 +83,10 @@ class SagaResult(BaseModel):
                 "status": "completed",
                 "context": {"author_id": "550e8400-e29b-41d4-a716-446655440000"},
                 "error": None,
-                "competed_at": "2024-01-01T10:00:00"
+                "completed_at": "2024-01-01T10:00:00",
             }
         }
+
 
 class SagaStepResult(BaseModel):
     step_id: int
@@ -78,18 +95,18 @@ class SagaStepResult(BaseModel):
     result: Optional[Any] = None
     error: Optional[str] = None
 
+
 class SagaInfo(BaseModel):
     saga_id: str
     saga_type: str
     status: str
     current_step: int
     total_steps: int
-    created_at: str
-    updated_at: str
     is_active: bool
     error: Optional[str] = None
 
-class SaraCreateRequest(BaseModel):
+
+class SagaCreateRequest(BaseModel):
     saga_type: str
     data: Dict[str, Any]
 
@@ -99,7 +116,7 @@ class SaraCreateRequest(BaseModel):
                 "saga_type": "create_author",
                 "data": {
                     "name": "John Doe",
-                    "rating": 4.5
+                    "rating": 4.5,
                 }
             }
         }

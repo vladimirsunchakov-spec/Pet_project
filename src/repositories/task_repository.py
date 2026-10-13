@@ -121,7 +121,7 @@ class TaskRepository(BaseRepository[TaskModel]):
             )
         return updated is not None
 
-    async def mark_retry(self, task_id: UUID, attempt_id: UUID, error: str) -> bool:
+    async def mark_retry(self, task_id: UUID, attempt_id: UUID, error: str) -> str:
         stmt = (
             select(TaskModel)
             .where(
@@ -137,7 +137,7 @@ class TaskRepository(BaseRepository[TaskModel]):
                 "Task %s mark_retry skipped: attempt_id mismatch or missing",
                 task_id,
             )
-            return False
+            return TaskStatus.FAILED
 
         task.attempts += 1
         now = datetime.now(timezone.utc)
@@ -163,7 +163,7 @@ class TaskRepository(BaseRepository[TaskModel]):
         task.error = error
         task.updated_at = now
         await self.db.flush()
-        return True
+        return task.status
 
     async def mark_failed(self, task_id: UUID, attempt_id: UUID, error: str) -> bool:
         result = await self.db.execute(

@@ -8,10 +8,9 @@ from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
 from contextlib import asynccontextmanager
-from src.services.saga import saga_orchestrator
+from src.services.author import saga_orchestrator
 from src.clients.bio_client import BioServiceClient
 from src.logger import setup_logging
-from src.db import async_session_maker
 from src.workers.bio_worker import create_bio_worker
 import logging
 
@@ -36,7 +35,7 @@ async def lifespan(app: FastAPI):
 
     if bio_client:
         try:
-            bio_worker = create_bio_worker(async_session_maker, bio_client)
+            bio_worker = create_bio_worker(bio_client)
             app.state.bio_worker = bio_worker
             await bio_worker.start()
             logger.info("Bio worker started")
@@ -44,10 +43,7 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Bio worker start failed: {e}")
 
         try:
-            saga_orchestrator.configure(
-                session_factory=async_session_maker,
-                bio_client=bio_client,
-            )
+            saga_orchestrator.configure(bio_client=bio_client)
             await saga_orchestrator.start()
             logger.info("Saga orchestrator started")
         except Exception as e:

@@ -2,7 +2,7 @@ from typing import Optional, List
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.exceptions import AlreadyExistsError, NotFoundError
+from src.exceptions import AlreadyExistsError
 from src.models.cities import CityModel
 from src.models.countries import CountryModel
 from src.repositories.base import BaseRepository
@@ -44,10 +44,6 @@ class CountryRepository(BaseRepository[CountryModel]):
         country_id: UUID,
         cities: List[CityCreate],
     ) -> List[CityModel]:
-        country = await self.get(country_id)
-        if not country:
-            raise NotFoundError("Country", str(country_id))
-
         existing_names = await self.get_existing_city_names(
             country_id,
             [city.name for city in cities],
@@ -57,7 +53,7 @@ class CountryRepository(BaseRepository[CountryModel]):
                 raise AlreadyExistsError("city", city_data.name)
 
         city_models = [
-            CityModel(name=city.name, country_id=country.id)
+            CityModel(name=city.name, country_id=country_id)
             for city in cities
         ]
         return await self.create_cities(city_models)

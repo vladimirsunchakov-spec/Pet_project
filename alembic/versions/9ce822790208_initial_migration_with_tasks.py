@@ -52,7 +52,6 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_tasks_status"), "tasks", ["status"], unique=False)
     op.create_index("ix_tasks_status_updated_at", "tasks", ["status", "updated_at"], unique=False)
     op.create_index(op.f("ix_tasks_task_type"), "tasks", ["task_type"], unique=False)
 
@@ -60,7 +59,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(op.f("ix_tasks_task_type"), table_name="tasks")
     op.drop_index("ix_tasks_status_updated_at", table_name="tasks")
-    op.drop_index(op.f("ix_tasks_status"), table_name="tasks")
     op.drop_table("tasks")
     op.drop_index(op.f("ix_saga_state_saga_id"), table_name="saga_state")
     op.drop_table("saga_state")

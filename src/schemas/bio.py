@@ -20,3 +20,7 @@ class BioResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class BioStatusUpdate(BaseModel):
+    status: str = Field(description="Статус bio: active или deleted")

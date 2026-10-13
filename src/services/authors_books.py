@@ -14,7 +14,7 @@ from src.clients.bio_client import BioServiceClient
 from src.exceptions import ExternalServiceError, ExternalServiceUnavailableError
 import logging
 from src.schemas.saga import SagaResult
-from src.services.saga import CreateAuthorSaga, DeleteAuthorSaga, saga_orchestrator
+from src.services.author import CreateAuthorSaga, DeleteAuthorSaga, saga_orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class AuthorsBooksService(BaseService):
         )
         if result.status in (
             SagaStatus.COMPLETED.value,
-            SagaStatus.COMPLETED_WITH_DEFERRED.value,
+            SagaStatus.WAITING_DEFERRED.value,
         ):
             author_id = UUID(result.context["author_id"])
             author = await self.author_repo.get(author_id)

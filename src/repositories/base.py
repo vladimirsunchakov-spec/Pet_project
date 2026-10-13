@@ -14,23 +14,12 @@ class BaseRepository(Generic[ModelType]):
         self.db = db
         self.model = model
 
-    async def get(
-        self,
-        id: UUID,
-        filters: dict[str, object] | None = None,
-    ) -> Optional[ModelType]:
+    async def get(self, id: UUID) -> Optional[ModelType]:
         query = select(self.model).where(self.model.id == id, self.model.is_deleted == False)
-        if filters:
-            for field, value in filters.items():
-                query = query.where(getattr(self.model, field) == value)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def update(
-        self,
-        id: UUID,
-        values: dict[str, object],
-    ) -> Optional[ModelType]:
+    async def update(self, id: UUID, values: dict[str, object]) -> Optional[ModelType]:
         stmt = (
             update(self.model)
             .where(self.model.id == id, self.model.is_deleted == False)
@@ -61,34 +50,23 @@ class BaseRepository(Generic[ModelType]):
     async def get_with_relations(
         self,
         id: UUID,
-        relations: list[str] | None = None,
-        filters: dict[str, object] | None = None,
+        relations: list[str],
     ) -> Optional[ModelType]:
         query = select(self.model).where(self.model.id == id, self.model.is_deleted == False)
-        if relations:
-            options = [selectinload(getattr(self.model, rel)) for rel in relations]
-            query = query.options(*options)
-        if filters:
-            for field, value in filters.items():
-                query = query.where(getattr(self.model, field) == value)
+        options = [selectinload(getattr(self.model, rel)) for rel in relations]
+        query = query.options(*options)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_all_with_relations(
         self,
+        relations: list[str],
         skip: int = 0,
         limit: int = 100,
-        relations: list[str] | None = None,
-        filters: dict[str, object] | None = None,
     ) -> List[ModelType]:
         query = select(self.model).where(self.model.is_deleted == False)
-        if relations:
-            options = [selectinload(getattr(self.model, rel)) for rel in relations]
-            query = query.options(*options)
-        if filters:
-            for field, value in filters.items():
-                query = query.where(getattr(self.model, field) == value)
-        query = query.offset(skip).limit(limit)
+        options = [selectinload(getattr(self.model, rel)) for rel in relations]
+        query = query.options(*options).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
@@ -96,7 +74,6 @@ class BaseRepository(Generic[ModelType]):
         self,
         id: UUID,
         relations: list[str] | None = None,
-        filters: dict[str, object] | None = None,
     ) -> Optional[ModelType]:
         query = (
             select(self.model)
@@ -106,8 +83,5 @@ class BaseRepository(Generic[ModelType]):
         if relations:
             options = [selectinload(getattr(self.model, rel)) for rel in relations]
             query = query.options(*options)
-        if filters:
-            for field, value in filters.items():
-                query = query.where(getattr(self.model, field) == value)
         result = await self.db.execute(query)
         return result.scalar_one_or_none()

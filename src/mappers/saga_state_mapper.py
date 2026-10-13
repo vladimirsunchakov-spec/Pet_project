@@ -13,8 +13,6 @@ class SagaStateMapper:
             current_step=model.current_step,
             context=model.context,
             error=model.error,
-            created_at=model.created_at,
-            updated_at=model.updated_at,
         )
 
     @staticmethod

@@ -1,12 +1,28 @@
-from typing import Optional, Any, Callable, Awaitable, List
+from typing import Optional, Callable, Awaitable, List
 from uuid import uuid4
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.schemas.saga import SagaStatus, SagaStep, SagaState, SagaStepStatus, SagaResult, SagaStateUpdate
+from src.schemas.saga import (
+    SagaStatus,
+    SagaStep,
+    SagaState,
+    SagaStepStatus,
+    SagaResult,
+    SagaStateUpdate,
+    SagaStepOutcome,
+    SagaStepOutcomeStatus,
+)
 from src.repositories.saga_state_repository import SagaStateRepository
 
 logger = logging.getLogger(__name__)
+
+_TERMINAL_STATUSES = {
+    SagaStatus.COMPLETED,
+    SagaStatus.COMPENSATED,
+    SagaStatus.FAILED,
+    SagaStatus.COMPENSATION_FAILED,
+}
 
 
 class BaseSaga:
@@ -35,7 +51,7 @@ class BaseSaga:
     def add_step(
         self,
         name: str,
-        action: Callable[[], Awaitable[Any]],
+        action: Callable[[], Awaitable[SagaStepOutcome]],
         compensation: Optional[Callable[[], Awaitable[None]]] = None,
     ) -> "BaseSaga":
         step = SagaStep(
@@ -48,11 +64,7 @@ class BaseSaga:
         return self
 
     async def execute(self) -> SagaResult:
-        if self.state.status in [
-            SagaStatus.COMPLETED,
-            SagaStatus.COMPLETED_WITH_DEFERRED,
-            SagaStatus.COMPENSATED,
-        ]:
+        if self.state.status in _TERMINAL_STATUSES:
             return SagaResult(
                 saga_id=self.saga_id,
                 status=self.state.status.value,
@@ -60,6 +72,16 @@ class BaseSaga:
                 error=self.state.error,
                 completed_at=datetime.now(timezone.utc),
             )
+
+        if self.state.status == SagaStatus.WAITING_DEFERRED:
+            return SagaResult(
+                saga_id=self.saga_id,
+                status=self.state.status.value,
+                context=self.state.context,
+                error=self.state.error,
+                completed_at=datetime.now(timezone.utc),
+            )
+
         self.state.status = SagaStatus.IN_PROGRESS
         await self._save_state()
 
@@ -72,22 +94,20 @@ class BaseSaga:
             for idx in range(start_idx, len(self._steps)):
                 step = self._steps[idx]
                 self._current_step_index = idx
-                self.state.current_step = idx
-
-                if step.status in [SagaStepStatus.SUCCESS, SagaStepStatus.DEFERRED]:
-                    if step.status == SagaStepStatus.DEFERRED:
-                        has_deferred = True
-                    continue
 
                 step.status = SagaStepStatus.EXECUTING
                 await self._save_state()
 
                 try:
-                    result = await step.action()
+                    outcome = await step.action()
+                    if not isinstance(outcome, SagaStepOutcome):
+                        raise TypeError(
+                            f"Step {step.name} must return SagaStepOutcome, got {type(outcome)!r}"
+                        )
 
-                    if result and isinstance(result, dict) and result.get("deferred"):
+                    if outcome.status == SagaStepOutcomeStatus.DEFERRED:
                         step.status = SagaStepStatus.DEFERRED
-                        step.result = result
+                        step.result = outcome.data
                         has_deferred = True
                         logger.warning(
                             "Saga %s: step %s deferred",
@@ -96,8 +116,9 @@ class BaseSaga:
                         )
                     else:
                         step.status = SagaStepStatus.SUCCESS
-                        step.result = result
+                        step.result = outcome.data
 
+                    self.state.current_step = idx + 1
                     await self._save_state()
 
                 except Exception as e:
@@ -115,7 +136,7 @@ class BaseSaga:
                     )
 
             if has_deferred:
-                self.state.status = SagaStatus.COMPLETED_WITH_DEFERRED
+                self.state.status = SagaStatus.WAITING_DEFERRED
             else:
                 self.state.status = SagaStatus.COMPLETED
             await self._save_state()
