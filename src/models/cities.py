@@ -17,5 +17,4 @@ class CityModel(Base):
         ForeignKey("countries.id", ondelete="CASCADE"),
         )
 
-
     country: Mapped["CountryModel"] = relationship(back_populates="cities")

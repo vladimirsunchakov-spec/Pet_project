@@ -6,7 +6,7 @@ from src.models.passports import PassportModel
 
 class PassportCreate(BaseModel):
     passport_number: str = Field(min_length=5, max_length=20)
-    user_id: UUID
+    user_id: Optional[UUID] = None
 
     @field_validator("passport_number")
     @classmethod
