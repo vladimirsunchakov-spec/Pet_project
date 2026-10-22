@@ -1,81 +1,74 @@
-from datetime import datetime, timezone
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
 from uuid import UUID
-from models.authors import AuthorModel
-from schemas.authors import AuthorResponse
-from schemas.users import UserResponse
 from src.exceptions import NotFoundError
 from src.services.base import BaseService
-from src.middleware.request_id import get_request_id
-from src.models.users import UserModel
-from src.schemas.users import UserCreate, UserUpdate
+from utils.request_id import get_request_id
+from src.schemas.users import UserCreate, UserUpdate, UserResponse
+from src.redis_client import redis_client
+from src.repositories.user_repository import UserRepository
+import logging
 
+logger = logging.getLogger(__name__)
 
 
 class UsersPassportsService(BaseService):
     def __init__(self, db: AsyncSession):
-        self.db = db
+        self.db: AsyncSession = db
         self.request_id = get_request_id()
+        self.user_repo = UserRepository(db)
 
     async def create_user(self, data: UserCreate) -> UserResponse:
-        self._log_info("Creating user", request_id=self.request_id, username=data.username, phone=data.phone)
+        async with self.db.begin_nested():
+            user = await self.user_repo.upsert_user(data.to_model())
 
-        user = data.to_model()
-        self.db.add(user)
-
-        await self.db.refresh(user)
-
-        self._log_info("Created user", entity_id=user.id,  request_id=self.request_id)
+        logger.info(
+            "User created",
+            extra={"entity_id": str(user.id), "request_id": self.request_id},
+        )
         return UserResponse.model_validate(user)
 
     async def get_user(self, user_id: UUID) -> UserResponse:
-        self._log_info("Fetching user", entity_id=user_id, request_id=self.request_id)
+        cache_key = f"user:{user_id}"
+        cached = await redis_client.get_cached(cache_key, UserResponse)
+        if cached:
+            return cached
 
-        query = (select(UserModel)
-                 .where(UserModel.id == user_id, UserModel.is_deleted == False)
-                 .options(selectinload(UserModel.passport)))
-        result = await self.db.execute(query)
-        user =  result.scalar_one_or_none()
-
+        user = await self.user_repo.get_with_relations(user_id, relations=["passport"])
         if not user:
-            self._log_error("User not found", entity_id=user_id, request_id=self.request_id)
             raise NotFoundError("User", str(user_id))
 
-        return UserResponse.model_validate(user)
+        response = UserResponse.model_validate(user)
+        await redis_client.set_cached(cache_key, response)
+        return response
 
     async def get_users(self, skip: int = 0, limit: int = 100) -> List[UserResponse]:
-        self._log_info("Fetching users", skip=skip, limit=limit, request_id=self.request_id)
-        query = (
-            select(UserModel)
-            .where(UserModel.is_deleted == False)
-            .offset(skip).limit(limit)
-            .options(selectinload(UserModel.passport))
-            .with_for_update(skip_locked=True)
+        users = await self.user_repo.get_all_with_relations(
+            skip=skip,
+            limit=limit,
+            relations=["passport"],
         )
-        result = await self.db.execute(query)
-        users = result.scalars().all()
+        return UserResponse.from_model_list(users)
 
-        return AuthorResponse.from_model_list(users)
+    async def update_user(self, user_id: UUID, data: UserUpdate) -> UserResponse:
+        async with self.db.begin_nested():
+            user = await self.user_repo.get_for_update(user_id, relations=["passport"])
+            if not user:
+                raise NotFoundError("User", str(user_id))
 
-    async def update_user(self, user_id: UUID, data:UserUpdate) -> UserResponse:
-        self._log_info("Updating user", entity_id=user_id, request_id=self.request_id)
+            data.update_model(user)
+            await self.db.flush()
 
-        user = await self.get_user(user_id=user_id)
-        data.update_model(user)
-
-        await self.db.refresh(user)
-
-        self._log_info("Updated user", entity_id=user.id, request_id=self.request_id)
+        await redis_client.invalidate(f"user:{user_id}")
         return UserResponse.model_validate(user)
 
     async def delete_user(self, user_id: UUID) -> None:
-        self._log_info("Deleting user", entity_id=user_id, request_id=self.request_id)
+        deleted = await self.user_repo.soft_delete(user_id)
+        if not deleted:
+            raise NotFoundError("User", str(user_id))
 
-        stmt = (update(UserModel).where(UserModel.id == user_id).values(is_deleted=True, deleted_at=datetime.now(timezone.utc)))
-
-        await self.db.execute(stmt)
-
-        self._log_info("Deleted user", entity_id=user_id, request_id=self.request_id)
+        await redis_client.invalidate(f"user:{user_id}")
+        logger.info(
+            "User deleted",
+            extra={"entity_id": str(user_id), "request_id": self.request_id},
+        )

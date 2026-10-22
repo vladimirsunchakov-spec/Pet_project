@@ -68,6 +68,9 @@ class AuthorResponse(BaseModel):
     books: List[BookSchema]
     birth_date: Optional[date]
     country: Optional[str]
+    rating: Optional[float] = None
+    awards_count: Optional[int] = None
+
 
     @classmethod
     def from_model_list(cls, models: List[AuthorModel]) -> List["AuthorResponse"]:

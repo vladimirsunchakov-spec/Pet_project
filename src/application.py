@@ -1,18 +1,89 @@
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
 from starlette.middleware.cors import CORSMiddleware
-from src.core.logger import setup_logging
-from middleware.request_id import RequestIdMiddleware
+from src.redis_client import redis_client
+from src.utils.request_id import RequestIdMiddleware
 from src.healthcheck.router import router as healthcheck_router
 from src.routers.authors_books import router as authors_books_router
 from src.routers.countries_cities import router as countries_cities_router
 from src.routers.users_passports import router as users_passports_router
+from contextlib import asynccontextmanager
+from src.services.author import saga_orchestrator
+from src.clients.bio_client import BioServiceClient
+from src.logger import setup_logging
+from src.workers.bio_worker import create_bio_worker
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        await redis_client.initialize()
+        logger.info("Redis connection established")
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}")
+
+    bio_client = None
+    try:
+        bio_client = BioServiceClient()
+        app.state.bio_client = bio_client
+        logger.info("BioServiceClient initialized")
+    except Exception as e:
+        logger.warning(f"BioServiceClient initialization failed: {e}")
+
+    if bio_client:
+        try:
+            bio_worker = create_bio_worker(bio_client)
+            app.state.bio_worker = bio_worker
+            await bio_worker.start()
+            logger.info("Bio worker started")
+        except Exception as e:
+            logger.warning(f"Bio worker start failed: {e}")
+
+        try:
+            saga_orchestrator.configure(bio_client=bio_client)
+            await saga_orchestrator.start()
+            logger.info("Saga orchestrator started")
+        except Exception as e:
+            logger.warning(f"Saga orchestrator start failed: {e}")
+
+    yield
+
+    try:
+        await saga_orchestrator.stop()
+        logger.info("Saga orchestrator stopped")
+    except Exception as e:
+        logger.warning(f"Saga orchestrator stop failed: {e}")
+
+    try:
+        if hasattr(app.state, "bio_worker"):
+            await app.state.bio_worker.stop()
+            logger.info("Bio worker stopped")
+    except Exception as e:
+        logger.warning(f"Bio worker stop failed: {e}")
+
+    try:
+        if hasattr(app.state, "bio_client"):
+            await app.state.bio_client.close()
+            logger.info("BioServiceClient closed")
+    except Exception as e:
+        logger.warning(f"BioServiceClient close failed: {e}")
+
+    try:
+        await redis_client.close()
+        logger.info("Redis connection closed")
+    except Exception as e:
+        logger.warning(f"Redis connection close failed: {e}")
+
 
 def register_routes(app: FastAPI) -> None:
     app.include_router(healthcheck_router)
     app.include_router(authors_books_router)
     app.include_router(countries_cities_router)
     app.include_router(users_passports_router)
+
 
 def get_app() -> FastAPI:
     setup_logging()
@@ -21,8 +92,10 @@ def get_app() -> FastAPI:
         docs_url='/docs',
         openapi_url='/openapi.json',
         default_response_class=UJSONResponse,
+        lifespan=lifespan,
     )
 
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
@@ -30,7 +103,6 @@ def get_app() -> FastAPI:
         allow_methods=['*'],
         allow_headers=['*'],
     )
-    app.add_middleware(RequestIdMiddleware)
 
     register_routes(app)
     return app
