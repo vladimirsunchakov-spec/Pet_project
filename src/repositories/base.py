@@ -27,11 +27,7 @@ class BaseRepository(Generic[ModelType]):
             .returning(self.model)
         )
         result = await self.db.execute(stmt)
-        updated = result.scalar_one_or_none()
-        await self.db.flush()
-        if updated is not None:
-            await self.db.refresh(updated)
-        return updated
+        return result.scalar_one_or_none()
 
     async def soft_delete(self, id: UUID) -> Optional[ModelType]:
         stmt = (
@@ -41,11 +37,7 @@ class BaseRepository(Generic[ModelType]):
             .returning(self.model)
         )
         result = await self.db.execute(stmt)
-        deleted = result.scalar_one_or_none()
-        await self.db.flush()
-        if deleted is not None:
-            await self.db.refresh(deleted)
-        return deleted
+        return result.scalar_one_or_none()
 
     async def get_with_relations(
         self,

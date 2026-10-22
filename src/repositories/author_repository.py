@@ -1,10 +1,10 @@
 from typing import Optional
 from uuid import UUID
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.authors import AuthorModel
 from src.repositories.base import BaseRepository
-from sqlalchemy import select, update
-from sqlalchemy.orm import selectinload
+
 
 class AuthorRepository(BaseRepository[AuthorModel]):
     def __init__(self, db: AsyncSession):
@@ -33,10 +33,6 @@ class AuthorRepository(BaseRepository[AuthorModel]):
             .returning(self.model)
         )
         result = await self.db.execute(stmt)
-        restored = result.scalar_one_or_none()
-        if restored:
-            await self.db.flush()
-            await self.db.refresh(restored)
-        return restored
+        return result.scalar_one_or_none()
 
 

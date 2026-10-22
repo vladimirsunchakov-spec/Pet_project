@@ -39,14 +39,9 @@ class Settings(BaseSettings):
     bio_worker_retry_backoff_seconds: int = 60
     bio_worker_processing_timeout_seconds: int = 300
     bio_worker_max_concurrency: int = 5
+    bio_worker_max_attempts: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
-
-SUCCESS_STATUS_CODE = (
-    HTTPStatus.OK,
-    HTTPStatus.CREATED,
-    HTTPStatus.NO_CONTENT,
-)

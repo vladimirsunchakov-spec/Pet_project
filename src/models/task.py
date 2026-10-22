@@ -35,7 +35,6 @@ class TaskModel(Base):
     )
     max_attempts: Mapped[int] = mapped_column(
         Integer,
-        default=5,
         nullable=False,
     )
     attempt_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -1,8 +1,9 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.config import settings
 from src.models.task import TaskModel
 from src.repositories.base import BaseRepository
 import logging
@@ -26,14 +27,18 @@ class TaskRepository(BaseRepository[TaskModel]):
         self,
         task_type: str,
         payload: dict,
-        max_attempts: int = 5,
+        max_attempts: Optional[int] = None,
     ) -> TaskModel:
         task = TaskModel(
             task_type=task_type,
             payload=payload,
             status=TaskStatus.PENDING,
             attempts=0,
-            max_attempts=max_attempts,
+            max_attempts=(
+                max_attempts
+                if max_attempts is not None
+                else settings.bio_worker_max_attempts
+            ),
         )
         self.db.add(task)
         await self.db.flush()

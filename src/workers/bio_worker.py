@@ -45,7 +45,18 @@ class BioCreationWorker:
                     await asyncio.sleep(settings.bio_worker_poll_interval_seconds)
                     continue
 
-                await asyncio.gather(*(self._process_task_guarded(task) for task in tasks))
+                results = await asyncio.gather(
+                    *(self._process_task_guarded(task) for task in tasks),
+                    return_exceptions=True,
+                )
+                for task, result in zip(tasks, results):
+                    if isinstance(result, Exception):
+                        logger.error(
+                            "Task %s failed in gather: %s",
+                            task.id,
+                            result,
+                            exc_info=result,
+                        )
 
             except asyncio.CancelledError:
                 logger.info("BioCreationWorker cancelled")
