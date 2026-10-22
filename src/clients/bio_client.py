@@ -54,9 +54,6 @@ class BioServiceClient:
     def _url(self, path_template: str, **params: object) -> str:
         return f"{self._base_url}{path_template.format(**params)}"
 
-    async def _execute_request(self, method: str, url: str, **kwargs) -> httpx.Response:
-        return await self._client.request(method, url, **kwargs)
-
     def _handle_response(self, response: httpx.Response, url: str) -> BioResponse:
         status_code = response.status_code
 
@@ -81,12 +78,12 @@ class BioServiceClient:
 
     @retry(**_RETRY)
     async def _get(self, url: str) -> BioResponse:
-        response = await self._execute_request("GET", url)
+        response = await self._client.get(url)
         return self._handle_response(response, url)
 
     @retry(**_RETRY)
     async def _post(self, url: str, data: dict, headers: dict) -> BioResponse:
-        response = await self._execute_request("POST", url, json=data, headers=headers)
+        response = await self._client.post(url, json=data, headers=headers)
         return self._handle_response(response, url)
 
     async def get_bio_by_author_id(self, author_id: UUID) -> BioResponse:
